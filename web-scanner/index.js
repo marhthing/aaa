@@ -102,8 +102,9 @@ async function createDatabaseAuthState(sessionId) {
     // Check if session already exists in database
     let savedData = await loadSession(sessionId);
     
+    // Initialize with proper structure for Baileys
     const authState = {
-        creds: savedData?.creds || {},
+        creds: savedData?.creds || null,
         keys: savedData?.keys || {
             preKeys: {},
             sessions: {},
@@ -116,7 +117,10 @@ async function createDatabaseAuthState(sessionId) {
     
     const saveCreds = async () => {
         try {
-            await saveSession(sessionId, authState);
+            // Only save if we have valid credentials
+            if (authState.creds) {
+                await saveSession(sessionId, authState);
+            }
         } catch (error) {
             console.error(`Failed to save credentials for ${sessionId}:`, error);
         }
@@ -178,56 +182,121 @@ io.on('connection', (socket) => {
             // Track active session
             activeSessions.set(sessionId, sock);
             
+            // Set session timeout (5 minutes)
+            const sessionTimeout = setTimeout(() => {
+                console.log(`⏰ Session timeout: ${sessionId}`);
+                
+                try {
+                    sock.end();
+                } catch (error) {
+                    console.error(`Error ending timed out session ${sessionId}:`, error);
+                }
+                
+                activeSessions.delete(sessionId);
+                
+                socket.emit('session-error', {
+                    sessionId,
+                    message: 'Session timed out. Please try again.',
+                    error: 'Timeout'
+                });
+            }, 5 * 60 * 1000); // 5 minutes
+            
+            // Clear timeout on successful connection or cleanup
+            const originalEnd = sock.end;
+            sock.end = function() {
+                clearTimeout(sessionTimeout);
+                return originalEnd.apply(this, arguments);
+            };
+            
             sock.ev.on('connection.update', async (update) => {
                 const { connection, lastDisconnect, qr } = update;
                 
                 if (qr) {
                     console.log(`📱 QR generated for: ${sessionId}`);
                     
-                    // Generate QR code as data URL
-                    const qrDataURL = await QRCode.toDataURL(qr);
-                    
-                    socket.emit('qr-code', {
-                        sessionId,
-                        qr: qrDataURL,
-                        message: 'Scan this QR code with WhatsApp'
-                    });
+                    try {
+                        // Generate QR code as data URL
+                        const qrDataURL = await QRCode.toDataURL(qr);
+                        
+                        socket.emit('qr-code', {
+                            sessionId,
+                            qr: qrDataURL,
+                            message: 'Scan this QR code with WhatsApp'
+                        });
+                    } catch (qrError) {
+                        console.error(`Failed to generate QR for ${sessionId}:`, qrError);
+                        socket.emit('session-error', {
+                            sessionId,
+                            message: 'Failed to generate QR code',
+                            error: qrError.message
+                        });
+                    }
                 }
                 
                 if (connection === 'open') {
                     console.log(`✅ Session connected: ${sessionId}`);
                     
-                    // Save final session to database
-                    const saved = await saveSession(sessionId, state);
-                    
-                    if (saved) {
-                        socket.emit('session-connected', {
-                            sessionId,
-                            message: 'WhatsApp connected successfully! Copy your session ID to use in the bot.',
-                            success: true
-                        });
-                    } else {
+                    try {
+                        // Save final session to database
+                        const saved = await saveSession(sessionId, state);
+                        
+                        if (saved) {
+                            socket.emit('session-connected', {
+                                sessionId,
+                                message: 'WhatsApp connected successfully! Copy your session ID to use in the bot.',
+                                success: true
+                            });
+                        } else {
+                            socket.emit('session-error', {
+                                sessionId,
+                                message: 'Failed to save session',
+                                error: 'Database error'
+                            });
+                        }
+                    } catch (saveError) {
+                        console.error(`Failed to save session ${sessionId}:`, saveError);
                         socket.emit('session-error', {
                             sessionId,
-                            message: 'Failed to save session',
-                            error: 'Database error'
+                            message: 'Failed to save session data',
+                            error: saveError.message
                         });
                     }
                     
                     // Clean up
-                    sock.end();
+                    try {
+                        sock.end();
+                    } catch (endError) {
+                        console.error(`Error ending socket for ${sessionId}:`, endError);
+                    }
                     activeSessions.delete(sessionId);
                 }
                 
                 if (connection === 'close') {
-                    const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+                    console.log(`🔌 Session closed: ${sessionId}`);
                     
-                    if (!shouldReconnect) {
-                        console.log(`❌ Session logged out: ${sessionId}`);
+                    // Clean up on close
+                    activeSessions.delete(sessionId);
+                    
+                    const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+                    const statusCode = lastDisconnect?.error?.output?.statusCode;
+                    
+                    if (statusCode === DisconnectReason.badSession) {
+                        socket.emit('session-error', {
+                            sessionId,
+                            message: 'Bad session - please generate a new session',
+                            error: 'Bad session'
+                        });
+                    } else if (statusCode === DisconnectReason.loggedOut) {
                         socket.emit('session-error', {
                             sessionId,
                             message: 'Session logged out',
                             error: 'Logged out'
+                        });
+                    } else if (lastDisconnect?.error) {
+                        socket.emit('session-error', {
+                            sessionId,
+                            message: `Connection failed: ${lastDisconnect.error.message}`,
+                            error: lastDisconnect.error.message
                         });
                     }
                 }
