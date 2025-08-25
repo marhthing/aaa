@@ -71,6 +71,37 @@ async function saveSession(sessionId, authState) {
     }
 }
 
+// Load session from database
+async function loadSession(sessionId) {
+    try {
+        const query = `SELECT session_data FROM whatsapp_sessions WHERE session_id = $1 AND is_active = true`;
+        const result = await pool.query(query, [sessionId]);
+        
+        if (result.rows.length > 0) {
+            return JSON.parse(result.rows[0].session_data);
+        }
+        return null;
+    } catch (error) {
+        console.error('Failed to load session:', error);
+        return null;
+    }
+}
+
+// Create database-backed auth state
+function createDatabaseAuthState(sessionId) {
+    const authState = {
+        creds: {},
+        keys: {}
+    };
+    
+    return {
+        state: authState,
+        saveCreds: async () => {
+            await saveSession(sessionId, authState);
+        }
+    };
+}
+
 // Routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -91,10 +122,8 @@ io.on('connection', (socket) => {
         try {
             console.log(`🔄 Starting session: ${sessionId}`);
             
-            // Create temporary session directory
-            const sessionPath = path.join(__dirname, 'temp_sessions', sessionId);
-            
-            const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+            // Use database-backed auth state instead of file system
+            const { state, saveCreds } = createDatabaseAuthState(sessionId);
             const { version } = await fetchLatestBaileysVersion();
             
             const sock = makeWASocket({
@@ -123,18 +152,13 @@ io.on('connection', (socket) => {
                 if (connection === 'open') {
                     console.log(`✅ Session connected: ${sessionId}`);
                     
-                    // Save session to database
-                    const authState = {
-                        creds: state.creds,
-                        keys: state.keys
-                    };
-                    
-                    const saved = await saveSession(sessionId, authState);
+                    // Save final session to database
+                    const saved = await saveSession(sessionId, state);
                     
                     if (saved) {
                         socket.emit('session-connected', {
                             sessionId,
-                            message: 'WhatsApp connected successfully!',
+                            message: 'WhatsApp connected successfully! Copy your session ID to use in the bot.',
                             success: true
                         });
                     } else {
