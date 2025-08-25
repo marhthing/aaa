@@ -6,7 +6,7 @@
 const express = require('express');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
-const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion, initAuthCreds, BufferJSON } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 const { Pool } = require('pg');
 const path = require('path');
@@ -104,7 +104,7 @@ async function createDatabaseAuthState(sessionId) {
     
     // Initialize with proper structure for Baileys
     const authState = {
-        creds: savedData?.creds || null,
+        creds: savedData?.creds,
         keys: savedData?.keys || {
             preKeys: {},
             sessions: {},
@@ -117,10 +117,7 @@ async function createDatabaseAuthState(sessionId) {
     
     const saveCreds = async () => {
         try {
-            // Only save if we have valid credentials
-            if (authState.creds) {
-                await saveSession(sessionId, authState);
-            }
+            await saveSession(sessionId, authState);
         } catch (error) {
             console.error(`Failed to save credentials for ${sessionId}:`, error);
         }
@@ -162,8 +159,17 @@ io.on('connection', (socket) => {
             
             console.log(`🔄 Starting session: ${sessionId} (${activeSessions.size + 1}/${MAX_CONCURRENT_SESSIONS})`);
             
-            // Use database-backed auth state instead of file system
-            const { state, saveCreds } = await createDatabaseAuthState(sessionId);
+            // Create temporary directory for this session
+            const fs = require('fs');
+            const tempDir = path.join(__dirname, 'temp', sessionId);
+            
+            // Ensure temp directory exists
+            if (!fs.existsSync(path.dirname(tempDir))) {
+                fs.mkdirSync(path.dirname(tempDir), { recursive: true });
+            }
+            
+            // Use file-based auth temporarily for QR generation
+            const { state, saveCreds } = await useMultiFileAuthState(tempDir);
             const { version } = await fetchLatestBaileysVersion();
             
             const sock = makeWASocket({
