@@ -1,100 +1,73 @@
 /**
- * MatDev WhatsApp Bot - Terminal Edition
- * Simple launcher-based WhatsApp bot
+ * MatDev WhatsApp Bot - Main Entry Point
+ * Terminal-based WhatsApp bot with session management
  */
 
-require('dotenv').config()
-const Bot = require('./lib/class/Bot')
-const config = require('./config')
-const logger = require('./lib/utils/logger')
+require('dotenv').config();
 
-// Global bot instance
-let botInstance = null
+const Bot = require('./lib/class/Bot');
+const config = require('./config');
+const logger = require('./lib/utils/logger');
 
 /**
- * Initialize and start the WhatsApp bot
+ * Main function to start the bot
  */
-async function startBot() {
-  try {
-    console.log('🤖 MatDev WhatsApp Bot - Terminal Edition')
-    console.log('==========================================')
-    
-    logger.info('🚀 Starting MatDev WhatsApp Bot...')
-    
-    // Create bot instance
-    botInstance = new Bot(config)
-    
-    // Set up event listeners
-    botInstance.on('ready', () => {
-      console.log('✅ Bot is ready and connected!')
-      console.log('📱 You can now use your WhatsApp bot')
-      logger.info('✅ Bot is ready and connected!')
-    })
-    
-    botInstance.on('disconnected', () => {
-      console.log('⚠️  Bot disconnected')
-      logger.warn('⚠️ Bot disconnected')
-    })
-    
-    botInstance.on('error', (error) => {
-      console.error('❌ Bot error:', error.message)
-      logger.error('Bot error:', error)
-    })
-    
-    // Start the bot
-    await botInstance.start()
-    
-  } catch (error) {
-    console.error('❌ Failed to start bot:', error.message)
-    logger.error('Failed to start bot:', error)
-    process.exit(1)
-  }
+async function main() {
+    try {
+        // Validate SESSION_ID
+        if (!process.env.SESSION_ID || process.env.SESSION_ID === 'updateThis') {
+            console.error('❌ SESSION_ID not configured!');
+            console.error('   Please set SESSION_ID in your environment or .env file');
+            console.error('   Get your session ID from your web scanner service');
+            process.exit(1);
+        }
+        
+        logger.info('🚀 Starting MatDev WhatsApp Bot...');
+        logger.info(`📱 Using SESSION_ID: ${process.env.SESSION_ID}`);
+        
+        // Create bot instance
+        const bot = new Bot(config);
+        
+        // Handle process termination
+        process.on('SIGINT', async () => {
+            logger.info('🔌 Shutting down bot...');
+            await bot.stop();
+            process.exit(0);
+        });
+        
+        process.on('SIGTERM', async () => {
+            logger.info('🔌 Shutting down bot...');
+            await bot.stop();
+            process.exit(0);
+        });
+        
+        // Handle uncaught exceptions
+        process.on('uncaughtException', (error) => {
+            logger.error('Uncaught Exception:', error);
+            process.exit(1);
+        });
+        
+        process.on('unhandledRejection', (reason, promise) => {
+            logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+            process.exit(1);
+        });
+        
+        // Start the bot
+        await bot.start();
+        
+        logger.info('✅ MatDev WhatsApp Bot is running!');
+        logger.info('📱 Scan the QR code with WhatsApp to connect');
+        
+    } catch (error) {
+        logger.error('Failed to start MatDev Bot:', error);
+        process.exit(1);
+    }
 }
 
-/**
- * Graceful shutdown handling
- */
-async function gracefulShutdown() {
-  console.log('📴 Shutting down MatDev bot...')
-  logger.info('📴 Shutting down MatDev bot...')
-  
-  try {
-    if (botInstance) {
-      await botInstance.disconnect()
-    }
-    
-    // Close database connections
-    const { sequelize } = require('./lib/db/models')
-    if (sequelize) {
-      await sequelize.close()
-    }
-    
-    console.log('✅ Graceful shutdown completed')
-    logger.info('✅ Graceful shutdown completed')
-    process.exit(0)
-  } catch (error) {
-    console.error('❌ Error during shutdown:', error.message)
-    logger.error('Error during shutdown:', error)
-    process.exit(1)
-  }
-}
+// Start the application
+main().catch((error) => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+});
 
-// Handle process signals
-process.on('SIGTERM', gracefulShutdown)
-process.on('SIGINT', gracefulShutdown)
-process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error.message)
-  logger.error('Uncaught Exception:', error)
-  gracefulShutdown()
-})
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection:', reason)
-  logger.error('Unhandled Rejection at:', promise, 'reason:', reason)
-})
-
-// Start the bot
-startBot().catch(error => {
-  console.error('❌ Failed to start bot:', error.message)
-  logger.error('Failed to start bot:', error)
-  process.exit(1)
-})
+module.exports = main;

@@ -10,7 +10,7 @@ require('dotenv').config();
  */
 const defaultConfig = {
     // Bot Identity
-    SESSION_ID: process.env.SESSION_ID || 'MatDev_Bot',
+    SESSION_ID: process.env.SESSION_ID || 'updateThis',
     PREFIX: process.env.PREFIX || '.',
     BOT_NAME: process.env.BOT_NAME || 'MatDev',
     BOT_LANG: process.env.BOT_LANG || 'en',

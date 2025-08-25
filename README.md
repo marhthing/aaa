@@ -5,8 +5,8 @@ A launcher-based WhatsApp bot similar to Levanter architecture.
 ## 🚀 Quick Start
 
 1. **Get Session ID**: Visit your web scanner service (hosted on Vercel/serverless)
-2. **Edit Launcher**: Open `launcher.js` and replace `updateThis` with your session ID
-3. **Run Bot**: Execute `node launcher.js`
+2. **Edit Launcher**: Open `index.js` and replace `updateThis` with your session ID
+3. **Run Bot**: Execute `node index.js`
 
 ```javascript
 const SESSION_ID = 'your-unique-session-id' // Edit this line
@@ -15,7 +15,7 @@ const SESSION_ID = 'your-unique-session-id' // Edit this line
 ## 📁 Project Structure
 
 ```
-├── launcher.js          # Main launcher (edit SESSION_ID here)
+├── index.js             # Main launcher (edit SESSION_ID here)
 ├── bot.js               # Core bot runner
 ├── lib/                 # Core system files
 ├── plugins/             # Bot plugins
