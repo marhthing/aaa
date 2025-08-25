@@ -268,9 +268,18 @@
         });
         
         socket.on('session-connected', (data) => {
-            showStatus('✅ WhatsApp connected successfully! Use your session ID in the bot launcher.', 'success');
+            showStatus(`✅ ${data.message || 'WhatsApp connected successfully! Use your session ID in the bot launcher.'}`, 'success');
             document.getElementById('qrContainer').style.display = 'none';
             document.getElementById('scanBtn').innerHTML = 'Connected ✅';
+            document.getElementById('scanBtn').disabled = false;
+            
+            // Show session ID prominently after successful connection
+            document.getElementById('sessionDisplay').innerHTML = `
+                <strong style="color: #25D366;">✅ SESSION READY:</strong><br>
+                <code style="background: #d4edda; padding: 8px; border-radius: 5px; color: #155724;">${currentSessionId}</code>
+                <button class="copy-btn" onclick="copySessionId()">Copy</button>
+                <br><small style="color: #666; margin-top: 5px;">Your session is saved and ready to use!</small>
+            `;
         });
         
         socket.on('session-error', (data) => {
