@@ -330,59 +330,67 @@ io.on('connection', (socket) => {
                     });
                 }
                 
-                // This is the key fix - wait for both connection open AND receivedPendingNotifications
-                if (connection === 'open' && receivedPendingNotifications && !session.sessionCompleted) {
-                    console.log(`🔐 Full authentication complete for: ${sessionId}`);
-                    session.hasReceivedNotifications = true;
-                    session.sessionCompleted = true;
+                // Wait for full authentication cycle - connection open + notifications + stable connection
+                if (connection === 'open' && !session.sessionCompleted) {
+                    console.log(`🔗 Connection established for: ${sessionId}, waiting for full sync...`);
+                    session.isConnected = true;
+                    
+                    // Wait longer for mobile WhatsApp to complete its sync
+                    setTimeout(async () => {
+                        const currentSession = activeSessions.get(sessionId);
+                        if (currentSession && !currentSession.sessionCompleted && currentSession.isConnected) {
+                            console.log(`🔐 Authentication stable, completing session: ${sessionId}`);
+                            currentSession.sessionCompleted = true;
                     
                     try {
-                        // Get user's WhatsApp JID
-                        const userJid = state.creds?.me?.id;
-                        
-                        // Save final session to database
-                        const saved = await saveSession(sessionId, state);
-                        
-                        if (saved) {
-                            // Send welcome message to user's WhatsApp
-                            console.log(`📧 Sending welcome message to: ${userJid}`);
-                            const messageSent = await sendWelcomeMessage(sock, sessionId, userJid);
-                            
-                            socket.emit('session-connected', {
-                                sessionId,
-                                message: `WhatsApp fully connected and authenticated! ${messageSent ? 'Welcome message sent.' : 'Session ready.'} Session saved and ready for bot use.`,
-                                success: true,
-                                userJid: userJid,
-                                welcomeMessageSent: messageSent
-                            });
-                            
-                            console.log(`✅ Session fully ready: ${sessionId} - Welcome message ${messageSent ? 'sent' : 'failed'}`);
-                            
-                            // Keep connection alive longer to ensure message is delivered and mobile WhatsApp completes
-                            setTimeout(() => {
-                                try {
-                                    sock.end();
-                                } catch (endError) {
-                                    console.error(`Error ending socket for ${sessionId}:`, endError);
+                                // Get user's WhatsApp JID
+                                const userJid = state.creds?.me?.id;
+                                
+                                // Save final session to database
+                                const saved = await saveSession(sessionId, state);
+                                
+                                if (saved) {
+                                    // Send welcome message to user's WhatsApp
+                                    console.log(`📧 Sending welcome message to: ${userJid}`);
+                                    const messageSent = await sendWelcomeMessage(sock, sessionId, userJid);
+                                    
+                                    socket.emit('session-connected', {
+                                        sessionId,
+                                        message: `WhatsApp fully connected and authenticated! ${messageSent ? 'Welcome message sent.' : 'Session ready.'} Session saved and ready for bot use.`,
+                                        success: true,
+                                        userJid: userJid,
+                                        welcomeMessageSent: messageSent
+                                    });
+                                    
+                                    console.log(`✅ Session fully ready: ${sessionId} - Welcome message ${messageSent ? 'sent' : 'failed'}`);
+                                    
+                                    // Keep connection alive longer to ensure message is delivered and mobile WhatsApp completes
+                                    setTimeout(() => {
+                                        try {
+                                            sock.end();
+                                        } catch (endError) {
+                                            console.error(`Error ending socket for ${sessionId}:`, endError);
+                                        }
+                                        activeSessions.delete(sessionId);
+                                        console.log(`🧹 Cleaned up completed session: ${sessionId}`);
+                                    }, 20000); // Wait 20 seconds for message delivery and cleanup
+                                } else {
+                                    socket.emit('session-error', {
+                                        sessionId,
+                                        message: 'Failed to save session',
+                                        error: 'Database error'
+                                    });
                                 }
-                                activeSessions.delete(sessionId);
-                                console.log(`🧹 Cleaned up completed session: ${sessionId}`);
-                            }, 15000); // Wait 15 seconds for message delivery and cleanup
-                        } else {
-                            socket.emit('session-error', {
-                                sessionId,
-                                message: 'Failed to save session',
-                                error: 'Database error'
-                            });
+                            } catch (saveError) {
+                                console.error(`Failed to save session ${sessionId}:`, saveError);
+                                socket.emit('session-error', {
+                                    sessionId,
+                                    message: 'Failed to save session data',
+                                    error: saveError.message
+                                });
+                            }
                         }
-                    } catch (saveError) {
-                        console.error(`Failed to save session ${sessionId}:`, saveError);
-                        socket.emit('session-error', {
-                            sessionId,
-                            message: 'Failed to save session data',
-                            error: saveError.message
-                        });
-                    }
+                    }, 10000); // Wait 10 seconds for mobile WhatsApp to complete pairing
                 }
                 
                 if (connection === 'close') {
@@ -417,21 +425,39 @@ io.on('connection', (socket) => {
                             error: 'Timeout'
                         });
                     } else if (statusCode === 515) {
-                        // Stream error - this might happen during authentication
-                        // If we have creds but haven't completed full auth, this might be part of the process
-                        if (state.creds?.me?.id && !session?.hasReceivedNotifications) {
-                            console.log(`⚠️ Stream error during authentication (515) for: ${sessionId} - this may be normal`);
-                            // Don't emit error yet, wait a bit to see if it reconnects
+                        // Stream error - this happens during authentication, usually normal
+                        if (state.creds?.me?.id && !session?.sessionCompleted) {
+                            console.log(`⚠️ Stream error (515) during authentication for: ${sessionId} - checking if session was saved...`);
+                            
+                            // Check if we already saved the session successfully
+                            const savedSession = await loadSession(sessionId);
+                            if (savedSession && savedSession.creds?.me?.id) {
+                                console.log(`✅ Session was saved successfully despite stream error: ${sessionId}`);
+                                
+                                socket.emit('session-connected', {
+                                    sessionId,
+                                    message: 'WhatsApp connected successfully! Session saved and ready for bot use.',
+                                    success: true,
+                                    userJid: state.creds.me.id,
+                                    welcomeMessageSent: false
+                                });
+                                
+                                activeSessions.delete(sessionId);
+                                return;
+                            }
+                            
+                            // Wait a bit longer to see if it recovers
                             setTimeout(() => {
                                 if (session && !session.sessionCompleted) {
+                                    console.log(`❌ Authentication did not complete within timeout for: ${sessionId}`);
                                     socket.emit('session-error', {
                                         sessionId,
-                                        message: 'Authentication incomplete - please try scanning again',
-                                        error: 'Authentication incomplete'
+                                        message: 'Authentication incomplete - mobile WhatsApp may need more time. Try scanning again.',
+                                        error: 'Authentication timeout'
                                     });
                                     activeSessions.delete(sessionId);
                                 }
-                            }, 5000);
+                            }, 8000); // Increased timeout
                             return;
                         }
                     } else if (lastError) {
