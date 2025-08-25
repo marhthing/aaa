@@ -230,7 +230,13 @@ io.on('connection', (socket) => {
                 keepAliveIntervalMs: 30000,
                 generateHighQualityLinkPreview: true,
                 syncFullHistory: false,
-                markOnlineOnConnect: false
+                markOnlineOnConnect: false,
+                getMessage: async () => undefined, // Ignore message history
+                shouldIgnoreJid: () => false,
+                retryRequestDelayMs: 250,
+                maxMsgRetryCount: 3,
+                fireInitQueries: false, // Important: prevents unnecessary queries
+                emitOwnEvents: false
             });
             
             // Track active session
@@ -264,9 +270,10 @@ io.on('connection', (socket) => {
             
             let pairingCompleted = false;
             let connectionEstablished = false;
+            let authenticationComplete = false;
             
             sock.ev.on('connection.update', async (update) => {
-                const { connection, lastDisconnect, qr } = update;
+                const { connection, lastDisconnect, qr, receivedPendingNotifications } = update;
                 
                 if (qr) {
                     console.log(`📱 QR generated for: ${sessionId}`);
@@ -294,59 +301,106 @@ io.on('connection', (socket) => {
                     console.log(`✅ Session connected: ${sessionId}`);
                     connectionEstablished = true;
                     
-                    try {
-                        // Get user's WhatsApp JID
-                        const userJid = state.creds?.me?.id;
+                    // Wait for receivedPendingNotifications to ensure full authentication
+                    if (receivedPendingNotifications) {
+                        authenticationComplete = true;
+                        console.log(`🔐 Authentication complete: ${sessionId}`);
                         
-                        if (userJid) {
-                            // Send welcome message with session ID after a short delay
-                            setTimeout(async () => {
-                                await sendWelcomeMessage(sock, sessionId, userJid);
-                            }, 2000);
-                        }
-                        
-                        // Save final session to database
-                        const saved = await saveSession(sessionId, state);
-                        
-                        if (saved) {
-                            socket.emit('session-connected', {
-                                sessionId,
-                                message: 'WhatsApp connected successfully! Session saved. Welcome message sent to your WhatsApp.',
-                                success: true,
-                                userJid: userJid
-                            });
-                        } else {
+                        try {
+                            // Get user's WhatsApp JID
+                            const userJid = state.creds?.me?.id;
+                            
+                            if (userJid) {
+                                // Send welcome message with session ID after a short delay
+                                setTimeout(async () => {
+                                    await sendWelcomeMessage(sock, sessionId, userJid);
+                                }, 3000);
+                            }
+                            
+                            // Save final session to database
+                            const saved = await saveSession(sessionId, state);
+                            
+                            if (saved) {
+                                socket.emit('session-connected', {
+                                    sessionId,
+                                    message: 'WhatsApp fully connected! Session saved. Welcome message sent to your WhatsApp.',
+                                    success: true,
+                                    userJid: userJid
+                                });
+                            } else {
+                                socket.emit('session-error', {
+                                    sessionId,
+                                    message: 'Failed to save session',
+                                    error: 'Database error'
+                                });
+                            }
+                        } catch (saveError) {
+                            console.error(`Failed to save session ${sessionId}:`, saveError);
                             socket.emit('session-error', {
                                 sessionId,
-                                message: 'Failed to save session',
-                                error: 'Database error'
+                                message: 'Failed to save session data',
+                                error: saveError.message
                             });
                         }
-                    } catch (saveError) {
-                        console.error(`Failed to save session ${sessionId}:`, saveError);
-                        socket.emit('session-error', {
-                            sessionId,
-                            message: 'Failed to save session data',
-                            error: saveError.message
-                        });
+                        
+                        // Clean up after successful completion
+                        setTimeout(() => {
+                            try {
+                                sock.end();
+                            } catch (endError) {
+                                console.error(`Error ending socket for ${sessionId}:`, endError);
+                            }
+                            activeSessions.delete(sessionId);
+                        }, 10000);
                     }
-                    
-                    // Clean up with longer delay to ensure message is sent
-                    setTimeout(() => {
-                        try {
-                            sock.end();
-                        } catch (endError) {
-                            console.error(`Error ending socket for ${sessionId}:`, endError);
-                        }
-                        activeSessions.delete(sessionId);
-                    }, 15000); // 15 second delay to allow message sending
                 }
                 
                 if (connection === 'close') {
                     console.log(`🔌 Session closed: ${sessionId}`);
                     
+                    const lastError = lastDisconnect?.error;
+                    const statusCode = lastError?.output?.statusCode;
+                    
+                    // Handle stream error (515) - this is expected after pairing
+                    if (statusCode === 515 && state.creds?.me?.id && !authenticationComplete) {
+                        console.log(`🔄 Stream error after pairing (expected behavior): ${sessionId}`);
+                        
+                        try {
+                            // Save session data immediately after pairing
+                            const saved = await saveSession(sessionId, state);
+                            
+                            if (saved) {
+                                socket.emit('session-connected', {
+                                    sessionId,
+                                    message: 'WhatsApp paired successfully! Your session is saved and ready to use.',
+                                    success: true,
+                                    userJid: state.creds.me.id
+                                });
+                                
+                                // Send welcome message to user
+                                setTimeout(async () => {
+                                    try {
+                                        await sendWelcomeMessage(sock, sessionId, state.creds.me.id);
+                                        console.log(`📧 Welcome message sent for pairing completion: ${sessionId}`);
+                                    } catch (msgError) {
+                                        console.log(`ℹ️ Could not send welcome message (normal for stream error): ${sessionId}`);
+                                    }
+                                }, 2000);
+                                
+                                // Clean up session
+                                setTimeout(() => {
+                                    activeSessions.delete(sessionId);
+                                }, 5000);
+                                
+                                return; // Don't continue with error handling
+                            }
+                        } catch (error) {
+                            console.error(`Failed to save pairing session ${sessionId}:`, error);
+                        }
+                    }
+                    
                     // Check if this was after successful pairing but before full connection
-                    if (state.creds?.me?.id && !connectionEstablished) {
+                    else if (state.creds?.me?.id && !connectionEstablished && !authenticationComplete) {
                         console.log(`✅ Pairing completed successfully: ${sessionId}`);
                         pairingCompleted = true;
                         
@@ -355,26 +409,17 @@ io.on('connection', (socket) => {
                             const saved = await saveSession(sessionId, state);
                             
                             if (saved) {
-                                // Don't end the session immediately, let it reconnect
                                 socket.emit('session-connected', {
                                     sessionId,
-                                    message: 'WhatsApp paired successfully! Finalizing connection...',
+                                    message: 'WhatsApp pairing complete! Session saved and ready to use.',
                                     success: true,
                                     userJid: state.creds.me.id
                                 });
                                 
-                                // Wait longer for potential reconnection
+                                // Clean up session
                                 setTimeout(() => {
-                                    if (!connectionEstablished) {
-                                        activeSessions.delete(sessionId);
-                                        socket.emit('session-connected', {
-                                            sessionId,
-                                            message: 'WhatsApp pairing complete! Session saved. Please wait for your phone to finish logging in...',
-                                            success: true,
-                                            userJid: state.creds.me.id
-                                        });
-                                    }
-                                }, 15000); // Wait 15 seconds for full connection
+                                    activeSessions.delete(sessionId);
+                                }, 5000);
                                 
                                 return; // Don't clean up immediately
                             }
