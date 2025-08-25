@@ -118,6 +118,28 @@
             border: 1px solid #bee5eb;
         }
         
+        .connection-info {
+            background: #e2f3ff;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+            display: none;
+            font-size: 0.9rem;
+        }
+        
+        .connection-info.show {
+            display: block;
+        }
+        
+        .user-jid {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 0.5rem;
+            border-radius: 5px;
+            margin: 0.5rem 0;
+            word-break: break-all;
+        }
+        
         .instructions {
             background: #f8f9fa;
             padding: 1.5rem;
@@ -163,6 +185,12 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .checkmark {
+            color: #25D366;
+            font-size: 1.2em;
+            margin-right: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -189,6 +217,11 @@
             <p style="margin-top: 1rem; color: #666;">Scan with WhatsApp</p>
         </div>
         
+        <div class="connection-info" id="connectionInfo">
+            <h4 style="color: #25D366; margin-bottom: 0.5rem;">📱 Connection Details</h4>
+            <div id="connectionDetails"></div>
+        </div>
+        
         <div class="instructions">
             <h3>📋 How to Use:</h3>
             <ol>
@@ -196,6 +229,7 @@
                 <li>Copy your unique session ID</li>
                 <li>Click "Start QR Scanning"</li>
                 <li>Scan QR code with WhatsApp</li>
+                <li>Wait for welcome message confirmation</li>
                 <li>Use session ID in your bot launcher</li>
             </ol>
         </div>
@@ -204,6 +238,7 @@
     <script>
         const socket = io();
         let currentSessionId = null;
+        let connectionStartTime = null;
         
         function showStatus(message, type = 'info') {
             const status = document.getElementById('status');
@@ -214,6 +249,13 @@
         
         function hideStatus() {
             document.getElementById('status').style.display = 'none';
+        }
+        
+        function showConnectionInfo(details) {
+            const connectionInfo = document.getElementById('connectionInfo');
+            const connectionDetails = document.getElementById('connectionDetails');
+            connectionDetails.innerHTML = details;
+            connectionInfo.classList.add('show');
         }
         
         async function generateSession() {
@@ -252,6 +294,7 @@
         function startScanning() {
             if (!currentSessionId) return;
             
+            connectionStartTime = Date.now();
             document.getElementById('scanBtn').innerHTML = '<div class="loading"></div>Connecting...';
             document.getElementById('scanBtn').disabled = true;
             
@@ -262,16 +305,47 @@
         
         // Socket events
         socket.on('qr-code', (data) => {
-            document.getElementById('qrCode').src = data.qr;
-            document.getElementById('qrContainer').style.display = 'block';
-            showStatus('QR Code ready! Scan with WhatsApp', 'info');
+            if (data.qr) {
+                document.getElementById('qrCode').src = data.qr;
+                document.getElementById('qrContainer').style.display = 'block';
+                showStatus('QR Code ready! Scan with WhatsApp', 'info');
+            } else if (data.message) {
+                showStatus(data.message, 'info');
+            }
         });
         
         socket.on('session-connected', (data) => {
-            showStatus(`✅ ${data.message || 'WhatsApp connected successfully! Use your session ID in the bot launcher.'}`, 'success');
+            const connectionTime = connectionStartTime ? 
+                Math.round((Date.now() - connectionStartTime) / 1000) : 0;
+            
+            let statusMessage = `✅ ${data.message || 'WhatsApp connected successfully!'}`;
+            if (data.welcomeMessageSent) {
+                statusMessage += ' Check your WhatsApp for confirmation message.';
+            }
+            
+            showStatus(statusMessage, 'success');
             document.getElementById('scanBtn').innerHTML = 'Connected ✅';
             document.getElementById('scanBtn').disabled = false;
             document.getElementById('qrContainer').style.display = 'none';
+            
+            // Show connection details
+            let connectionDetails = `
+                <div><span class="checkmark">✅</span><strong>Status:</strong> Connected & Authenticated</div>
+                <div><span class="checkmark">✅</span><strong>Connection Time:</strong> ${connectionTime}s</div>
+            `;
+            
+            if (data.userJid) {
+                connectionDetails += `
+                    <div><span class="checkmark">✅</span><strong>WhatsApp ID:</strong></div>
+                    <div class="user-jid">${data.userJid}</div>
+                `;
+            }
+            
+            if (data.welcomeMessageSent) {
+                connectionDetails += `<div><span class="checkmark">✅</span><strong>Welcome Message:</strong> Sent to your WhatsApp</div>`;
+            }
+            
+            showConnectionInfo(connectionDetails);
             
             // Show session ID prominently after successful connection
             document.getElementById('sessionDisplay').innerHTML = `

@@ -33,7 +33,7 @@ const pool = new Pool({
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
     max: 5, // Reduced for serverless
     idleTimeoutMillis: 10000,
-    connectionTimeoutMillis: 10000, // Increased timeout
+    connectionTimeoutMs: 10000, // Increased timeout
     allowExitOnIdle: true // Important for serverless
 });
 
@@ -64,31 +64,45 @@ const WELCOME_MESSAGE = `🎉 *MatDev Bot Connected Successfully!*
 
 ✅ Your WhatsApp has been linked to MatDev Bot
 🔑 *Session ID:* {{SESSION_ID}}
+👤 *Your WhatsApp ID:* {{USER_JID}}
 🤖 *Bot Name:* MatDev Assistant
+⏰ *Connected at:* {{TIMESTAMP}}
 
 *What's Next?*
 • Copy your Session ID above
-• Use it in your bot configuration
+• Use it in your bot configuration  
 • Start enjoying automated WhatsApp features!
+
+*Important Notes:*
+• Keep your Session ID secure and private
+• Don't share it with unauthorized users
+• Your session is now saved and ready to use
 
 _Thank you for using MatDev Bot! 🚀_
 
 ---
-*Keep your Session ID secure and don't share it with others.*`;
+*This is an automated confirmation message.*`;
 
 // Send welcome message with session ID
 async function sendWelcomeMessage(sock, sessionId, userJid) {
     try {
-        const message = WELCOME_MESSAGE.replace('{{SESSION_ID}}', sessionId);
+        const timestamp = new Date().toLocaleString();
+        const message = WELCOME_MESSAGE
+            .replace('{{SESSION_ID}}', sessionId)
+            .replace('{{USER_JID}}', userJid)
+            .replace('{{TIMESTAMP}}', timestamp);
+        
+        // Wait a bit to ensure connection is stable before sending message
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
         await sock.sendMessage(userJid, { 
             text: message 
         });
         
-        console.log(`📧 Welcome message sent to: ${userJid}`);
+        console.log(`📧 Welcome message sent successfully to: ${userJid} for session: ${sessionId}`);
         return true;
     } catch (error) {
-        console.error('Failed to send welcome message:', error);
+        console.error(`Failed to send welcome message to ${userJid}:`, error);
         return false;
     }
 }
@@ -240,26 +254,35 @@ io.on('connection', (socket) => {
             });
             
             // Track active session
-            activeSessions.set(sessionId, sock);
+            activeSessions.set(sessionId, {
+                socket: sock,
+                clientSocket: socket,
+                isConnected: false,
+                hasReceivedNotifications: false,
+                sessionCompleted: false
+            });
             
-            // Set session timeout (10 minutes)
+            // Set session timeout (15 minutes instead of 10)
             const sessionTimeout = setTimeout(() => {
                 console.log(`⏰ Session timeout: ${sessionId}`);
                 
-                try {
-                    sock.end();
-                } catch (error) {
-                    console.error(`Error ending timed out session ${sessionId}:`, error);
+                const session = activeSessions.get(sessionId);
+                if (session && !session.sessionCompleted) {
+                    try {
+                        session.socket.end();
+                    } catch (error) {
+                        console.error(`Error ending timed out session ${sessionId}:`, error);
+                    }
+                    
+                    activeSessions.delete(sessionId);
+                    
+                    socket.emit('session-error', {
+                        sessionId,
+                        message: 'Session timed out. Please try again.',
+                        error: 'Timeout'
+                    });
                 }
-                
-                activeSessions.delete(sessionId);
-                
-                socket.emit('session-error', {
-                    sessionId,
-                    message: 'Session timed out. Please try again.',
-                    error: 'Timeout'
-                });
-            }, 10 * 60 * 1000); // 10 minutes
+            }, 15 * 60 * 1000); // 15 minutes
             
             // Clear timeout on successful connection or cleanup
             const originalEnd = sock.end;
@@ -268,12 +291,11 @@ io.on('connection', (socket) => {
                 return originalEnd.apply(this, arguments);
             };
             
-            let pairingCompleted = false;
-            let connectionEstablished = false;
-            let authenticationComplete = false;
-            
             sock.ev.on('connection.update', async (update) => {
                 const { connection, lastDisconnect, qr, receivedPendingNotifications } = update;
+                const session = activeSessions.get(sessionId);
+                
+                if (!session || session.sessionCompleted) return;
                 
                 if (qr) {
                     console.log(`📱 QR generated for: ${sessionId}`);
@@ -298,154 +320,142 @@ io.on('connection', (socket) => {
                 }
                 
                 if (connection === 'open') {
-                    console.log(`✅ Session connected: ${sessionId}`);
-                    connectionEstablished = true;
+                    console.log(`✅ Connection opened for: ${sessionId}`);
+                    session.isConnected = true;
                     
-                    // Wait for receivedPendingNotifications to ensure full authentication
-                    if (receivedPendingNotifications) {
-                        authenticationComplete = true;
-                        console.log(`🔐 Authentication complete: ${sessionId}`);
+                    // Don't mark as complete yet - wait for receivedPendingNotifications
+                    socket.emit('qr-code', {
+                        sessionId,
+                        message: 'WhatsApp connected! Finalizing authentication...'
+                    });
+                }
+                
+                // This is the key fix - wait for both connection open AND receivedPendingNotifications
+                if (connection === 'open' && receivedPendingNotifications && !session.sessionCompleted) {
+                    console.log(`🔐 Full authentication complete for: ${sessionId}`);
+                    session.hasReceivedNotifications = true;
+                    session.sessionCompleted = true;
+                    
+                    try {
+                        // Get user's WhatsApp JID
+                        const userJid = state.creds?.me?.id;
                         
-                        try {
-                            // Get user's WhatsApp JID
-                            const userJid = state.creds?.me?.id;
+                        // Save final session to database
+                        const saved = await saveSession(sessionId, state);
+                        
+                        if (saved) {
+                            // Send welcome message to user's WhatsApp
+                            console.log(`📧 Sending welcome message to: ${userJid}`);
+                            const messageSent = await sendWelcomeMessage(sock, sessionId, userJid);
                             
-                            // Save final session to database
-                            const saved = await saveSession(sessionId, state);
+                            socket.emit('session-connected', {
+                                sessionId,
+                                message: `WhatsApp fully connected and authenticated! ${messageSent ? 'Welcome message sent.' : 'Session ready.'} Session saved and ready for bot use.`,
+                                success: true,
+                                userJid: userJid,
+                                welcomeMessageSent: messageSent
+                            });
                             
-                            if (saved) {
-                                socket.emit('session-connected', {
-                                    sessionId,
-                                    message: 'WhatsApp fully connected! Session saved and ready for bot use.',
-                                    success: true,
-                                    userJid: userJid
-                                });
-                            } else {
-                                socket.emit('session-error', {
-                                    sessionId,
-                                    message: 'Failed to save session',
-                                    error: 'Database error'
-                                });
-                            }
-                        } catch (saveError) {
-                            console.error(`Failed to save session ${sessionId}:`, saveError);
+                            console.log(`✅ Session fully ready: ${sessionId} - Welcome message ${messageSent ? 'sent' : 'failed'}`);
+                            
+                            // Keep connection alive longer to ensure message is delivered and mobile WhatsApp completes
+                            setTimeout(() => {
+                                try {
+                                    sock.end();
+                                } catch (endError) {
+                                    console.error(`Error ending socket for ${sessionId}:`, endError);
+                                }
+                                activeSessions.delete(sessionId);
+                                console.log(`🧹 Cleaned up completed session: ${sessionId}`);
+                            }, 15000); // Wait 15 seconds for message delivery and cleanup
+                        } else {
                             socket.emit('session-error', {
                                 sessionId,
-                                message: 'Failed to save session data',
-                                error: saveError.message
+                                message: 'Failed to save session',
+                                error: 'Database error'
                             });
                         }
-                        
-                        // Clean up after successful completion
-                        setTimeout(() => {
-                            try {
-                                sock.end();
-                            } catch (endError) {
-                                console.error(`Error ending socket for ${sessionId}:`, endError);
-                            }
-                            activeSessions.delete(sessionId);
-                        }, 5000);
+                    } catch (saveError) {
+                        console.error(`Failed to save session ${sessionId}:`, saveError);
+                        socket.emit('session-error', {
+                            sessionId,
+                            message: 'Failed to save session data',
+                            error: saveError.message
+                        });
                     }
                 }
                 
                 if (connection === 'close') {
-                    console.log(`🔌 Session closed: ${sessionId}`);
-                    
                     const lastError = lastDisconnect?.error;
                     const statusCode = lastError?.output?.statusCode;
                     
-                    // Handle stream error (515) - this is expected after pairing
-                    if (statusCode === 515 && state.creds?.me?.id && !authenticationComplete) {
-                        console.log(`✅ Stream error after pairing (this is normal): ${sessionId}`);
-                        
-                        try {
-                            // Save session data immediately after pairing
-                            const saved = await saveSession(sessionId, state);
-                            
-                            if (saved) {
-                                socket.emit('session-connected', {
-                                    sessionId,
-                                    message: 'WhatsApp paired successfully! Your session is saved and ready to use. No welcome message needed - pairing complete.',
-                                    success: true,
-                                    userJid: state.creds.me.id
-                                });
-                                
-                                console.log(`✅ Pairing completed successfully: ${sessionId} - Session ready for bot use`);
-                                
-                                // Clean up session
-                                setTimeout(() => {
-                                    activeSessions.delete(sessionId);
-                                }, 3000);
-                                
-                                return; // Don't continue with error handling
-                            }
-                        } catch (error) {
-                            console.error(`Failed to save pairing session ${sessionId}:`, error);
-                        }
+                    console.log(`🔌 Connection closed for: ${sessionId}, Status: ${statusCode}, Session completed: ${session?.sessionCompleted}`);
+                    
+                    // Don't handle as error if session was already completed successfully
+                    if (session?.sessionCompleted) {
+                        console.log(`✅ Normal close after successful completion: ${sessionId}`);
+                        return;
                     }
                     
-                    // Check if this was after successful pairing but before full connection
-                    else if (state.creds?.me?.id && !connectionEstablished && !authenticationComplete) {
-                        console.log(`✅ Pairing completed successfully: ${sessionId}`);
-                        pairingCompleted = true;
-                        
-                        try {
-                            // Save session data
-                            const saved = await saveSession(sessionId, state);
-                            
-                            if (saved) {
-                                socket.emit('session-connected', {
-                                    sessionId,
-                                    message: 'WhatsApp pairing complete! Session saved and ready to use.',
-                                    success: true,
-                                    userJid: state.creds.me.id
-                                });
-                                
-                                // Clean up session
-                                setTimeout(() => {
+                    // Handle different disconnect scenarios
+                    if (statusCode === DisconnectReason.loggedOut) {
+                        socket.emit('session-error', {
+                            sessionId,
+                            message: 'Session logged out - please scan QR code again',
+                            error: 'Logged out'
+                        });
+                    } else if (statusCode === DisconnectReason.badSession) {
+                        socket.emit('session-error', {
+                            sessionId,
+                            message: 'Bad session - please generate a new session',
+                            error: 'Bad session'
+                        });
+                    } else if (statusCode === DisconnectReason.timedOut) {
+                        socket.emit('session-error', {
+                            sessionId,
+                            message: 'Connection timed out - please try again',
+                            error: 'Timeout'
+                        });
+                    } else if (statusCode === 515) {
+                        // Stream error - this might happen during authentication
+                        // If we have creds but haven't completed full auth, this might be part of the process
+                        if (state.creds?.me?.id && !session?.hasReceivedNotifications) {
+                            console.log(`⚠️ Stream error during authentication (515) for: ${sessionId} - this may be normal`);
+                            // Don't emit error yet, wait a bit to see if it reconnects
+                            setTimeout(() => {
+                                if (session && !session.sessionCompleted) {
+                                    socket.emit('session-error', {
+                                        sessionId,
+                                        message: 'Authentication incomplete - please try scanning again',
+                                        error: 'Authentication incomplete'
+                                    });
                                     activeSessions.delete(sessionId);
-                                }, 5000);
-                                
-                                return; // Don't clean up immediately
-                            }
-                        } catch (error) {
-                            console.error(`Failed to save pairing session ${sessionId}:`, error);
+                                }
+                            }, 5000);
+                            return;
                         }
+                    } else if (lastError) {
+                        socket.emit('session-error', {
+                            sessionId,
+                            message: `Connection failed: ${lastError.message}`,
+                            error: lastError.message
+                        });
                     }
                     
-                    // Normal cleanup for other scenarios
-                    if (!pairingCompleted) {
-                        activeSessions.delete(sessionId);
-                        
-                        const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-                        const statusCode = lastDisconnect?.error?.output?.statusCode;
-                        
-                        // Handle specific error codes
-                        if (statusCode === DisconnectReason.badSession) {
-                            socket.emit('session-error', {
-                                sessionId,
-                                message: 'Bad session - please generate a new session',
-                                error: 'Bad session'
-                            });
-                        } else if (statusCode === DisconnectReason.loggedOut) {
-                            socket.emit('session-error', {
-                                sessionId,
-                                message: 'Session logged out',
-                                error: 'Logged out'
-                            });
-                        } else if (lastDisconnect?.error && !shouldReconnect) {
-                            // Only emit error if not a normal restart scenario
-                            socket.emit('session-error', {
-                                sessionId,
-                                message: `Connection failed: ${lastDisconnect.error.message}`,
-                                error: lastDisconnect.error.message
-                            });
-                        }
-                    }
+                    // Clean up session
+                    activeSessions.delete(sessionId);
                 }
             });
             
             sock.ev.on('creds.update', saveCreds);
+            
+            // Handle messages to detect successful connection
+            sock.ev.on('messages.upsert', async (m) => {
+                const session = activeSessions.get(sessionId);
+                if (session && session.isConnected && !session.sessionCompleted) {
+                    console.log(`📩 Messages received for: ${sessionId} - connection is stable`);
+                }
+            });
             
         } catch (error) {
             console.error(`Failed to start session ${sessionId}:`, error);
@@ -464,11 +474,15 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
         // Clean up any hanging sessions for this socket
-        for (const [sessionId, sock] of activeSessions.entries()) {
-            if (sock.socketId === socket.id) {
-                sock.end();
+        for (const [sessionId, sessionData] of activeSessions.entries()) {
+            if (sessionData.clientSocket === socket) {
+                try {
+                    sessionData.socket.end();
+                } catch (error) {
+                    console.error(`Error ending socket for disconnected client ${sessionId}:`, error);
+                }
                 activeSessions.delete(sessionId);
-                console.log(`🧹 Cleaned up session: ${sessionId}`);
+                console.log(`🧹 Cleaned up session for disconnected client: ${sessionId}`);
             }
         }
     });
@@ -476,6 +490,7 @@ io.on('connection', (socket) => {
 
 // Start server
 const PORT = process.env.PORT || 5000;
+
 
 // For Vercel deployment
 if (process.env.VERCEL) {
