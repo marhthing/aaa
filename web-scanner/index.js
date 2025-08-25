@@ -262,7 +262,7 @@ io.on('connection', (socket) => {
                 sessionCompleted: false
             });
             
-            // Set session timeout (15 minutes instead of 10)
+            // Set session timeout (20 minutes for mobile compatibility)
             const sessionTimeout = setTimeout(() => {
                 console.log(`⏰ Session timeout: ${sessionId}`);
                 
@@ -282,7 +282,7 @@ io.on('connection', (socket) => {
                         error: 'Timeout'
                     });
                 }
-            }, 15 * 60 * 1000); // 15 minutes
+            }, 20 * 60 * 1000); // 20 minutes
             
             // Clear timeout on successful connection or cleanup
             const originalEnd = sock.end;
@@ -335,7 +335,7 @@ io.on('connection', (socket) => {
                     console.log(`🔗 Connection established for: ${sessionId}, waiting for full sync...`);
                     session.isConnected = true;
                     
-                    // Wait longer for mobile WhatsApp to complete its sync
+                    // Wait much longer for mobile WhatsApp to complete its sync (increased from 10s to 25s)
                     setTimeout(async () => {
                         const currentSession = activeSessions.get(sessionId);
                         if (currentSession && !currentSession.sessionCompleted && currentSession.isConnected) {
@@ -373,7 +373,7 @@ io.on('connection', (socket) => {
                                         }
                                         activeSessions.delete(sessionId);
                                         console.log(`🧹 Cleaned up completed session: ${sessionId}`);
-                                    }, 20000); // Wait 20 seconds for message delivery and cleanup
+                                    }, 30000); // Wait 30 seconds for message delivery and cleanup
                                 } else {
                                     socket.emit('session-error', {
                                         sessionId,
@@ -390,7 +390,7 @@ io.on('connection', (socket) => {
                                 });
                             }
                         }
-                    }, 10000); // Wait 10 seconds for mobile WhatsApp to complete pairing
+                    }, 25000); // Wait 25 seconds for mobile WhatsApp to complete pairing
                 }
                 
                 if (connection === 'close') {
@@ -446,7 +446,7 @@ io.on('connection', (socket) => {
                                 return;
                             }
                             
-                            // Wait a bit longer to see if it recovers
+                            // Wait much longer to see if it recovers for mobile devices
                             setTimeout(() => {
                                 if (session && !session.sessionCompleted) {
                                     console.log(`❌ Authentication did not complete within timeout for: ${sessionId}`);
@@ -457,7 +457,7 @@ io.on('connection', (socket) => {
                                     });
                                     activeSessions.delete(sessionId);
                                 }
-                            }, 8000); // Increased timeout
+                            }, 20000); // Much longer timeout for mobile devices
                             return;
                         }
                     } else if (lastError) {
