@@ -27,13 +27,14 @@ const io = new Server(server, {
 const activeSessions = new Map();
 const MAX_CONCURRENT_SESSIONS = 50;
 
-// Database connection with optimized pool for concurrent users
+// Database connection optimized for Vercel
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-    max: 20, // Maximum pool size
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    max: 5, // Reduced for serverless
+    idleTimeoutMillis: 10000,
+    connectionTimeoutMillis: 10000, // Increased timeout
+    allowExitOnIdle: true // Important for serverless
 });
 
 // Initialize database
@@ -122,7 +123,12 @@ async function loadSession(sessionId) {
         const result = await pool.query(query, [sessionId]);
         
         if (result.rows.length > 0) {
-            return JSON.parse(result.rows[0].session_data);
+            const rawData = JSON.parse(result.rows[0].session_data);
+            // Deserialize Buffers using BufferJSON
+            return {
+                creds: JSON.parse(JSON.stringify(rawData.creds), BufferJSON.reviver),
+                keys: JSON.parse(JSON.stringify(rawData.keys), BufferJSON.reviver)
+            };
         }
         return null;
     } catch (error) {
@@ -131,27 +137,44 @@ async function loadSession(sessionId) {
     }
 }
 
-// Create database-backed auth state
+// Create database-backed auth state (Vercel compatible - no filesystem)
 async function createDatabaseAuthState(sessionId) {
     // Check if session already exists in database
     let savedData = await loadSession(sessionId);
     
-    // Initialize with proper structure for Baileys
-    const authState = {
-        creds: savedData?.creds,
-        keys: savedData?.keys || {
-            preKeys: {},
-            sessions: {},
-            senderKeys: {},
-            appStateSyncKeys: {},
-            appStateVersions: {},
-            senderKeyMemory: {}
-        }
-    };
+    // Initialize auth state for Baileys
+    let authState;
+    
+    if (savedData && savedData.creds && savedData.keys) {
+        // Use existing session data
+        authState = {
+            creds: savedData.creds,
+            keys: savedData.keys
+        };
+    } else {
+        // Initialize fresh auth state using Baileys' initAuthCreds
+        const freshCreds = initAuthCreds();
+        authState = {
+            creds: freshCreds,
+            keys: {
+                preKeys: {},
+                sessions: {},
+                senderKeys: {},
+                appStateSyncKeys: {},
+                appStateVersions: {},
+                senderKeyMemory: {}
+            }
+        };
+    }
     
     const saveCreds = async () => {
         try {
-            await saveSession(sessionId, authState);
+            // Use BufferJSON to properly serialize Buffers for database storage
+            const serializedData = {
+                creds: JSON.parse(JSON.stringify(authState.creds, BufferJSON.replacer)),
+                keys: JSON.parse(JSON.stringify(authState.keys, BufferJSON.replacer))
+            };
+            await saveSession(sessionId, serializedData);
         } catch (error) {
             console.error(`Failed to save credentials for ${sessionId}:`, error);
         }
@@ -193,17 +216,8 @@ io.on('connection', (socket) => {
             
             console.log(`🔄 Starting session: ${sessionId} (${activeSessions.size + 1}/${MAX_CONCURRENT_SESSIONS})`);
             
-            // Create temporary directory for this session
-            const fs = require('fs');
-            const tempDir = path.join(__dirname, 'temp', sessionId);
-            
-            // Ensure temp directory exists
-            if (!fs.existsSync(path.dirname(tempDir))) {
-                fs.mkdirSync(path.dirname(tempDir), { recursive: true });
-            }
-            
-            // Use file-based auth temporarily for QR generation
-            const { state, saveCreds } = await useMultiFileAuthState(tempDir);
+            // Use database-only auth state (Vercel compatible - no file system)
+            const { state, saveCreds } = await createDatabaseAuthState(sessionId);
             const { version } = await fetchLatestBaileysVersion();
             
             const sock = makeWASocket({
