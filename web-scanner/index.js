@@ -355,7 +355,7 @@ io.on('connection', (socket) => {
                     console.log(`🔗 Connection established for: ${sessionId}, waiting for full sync...`);
                     session.isConnected = true;
                     
-                    // Wait much longer for mobile WhatsApp to complete its sync (increased from 10s to 25s)
+                    // Wait much longer for mobile WhatsApp to complete its sync (increased to 45s for mobile compatibility)
                     setTimeout(async () => {
                         const currentSession = activeSessions.get(sessionId);
                         if (currentSession && !currentSession.sessionCompleted && currentSession.isConnected) {
@@ -414,7 +414,7 @@ io.on('connection', (socket) => {
                                 });
                             }
                         }
-                    }, 25000); // Wait 25 seconds for mobile WhatsApp to complete pairing
+                    }, 45000); // Wait 45 seconds for mobile WhatsApp to complete pairing
                 }
                 
                 if (connection === 'close') {
@@ -481,7 +481,7 @@ io.on('connection', (socket) => {
                                     });
                                     activeSessions.delete(sessionId);
                                 }
-                            }, 20000); // Much longer timeout for mobile devices
+                            }, 35000); // Much longer timeout for mobile devices
                             return;
                         }
                     } else if (lastError) {
