@@ -236,7 +236,7 @@ io.on('connection', (socket) => {
             // Track active session
             activeSessions.set(sessionId, sock);
             
-            // Set session timeout (5 minutes)
+            // Set session timeout (10 minutes)
             const sessionTimeout = setTimeout(() => {
                 console.log(`⏰ Session timeout: ${sessionId}`);
                 
@@ -253,7 +253,7 @@ io.on('connection', (socket) => {
                     message: 'Session timed out. Please try again.',
                     error: 'Timeout'
                 });
-            }, 5 * 60 * 1000); // 5 minutes
+            }, 10 * 60 * 1000); // 10 minutes
             
             // Clear timeout on successful connection or cleanup
             const originalEnd = sock.end;
@@ -339,7 +339,7 @@ io.on('connection', (socket) => {
                             console.error(`Error ending socket for ${sessionId}:`, endError);
                         }
                         activeSessions.delete(sessionId);
-                    }, 8000); // 8 second delay to allow message sending
+                    }, 15000); // 15 second delay to allow message sending
                 }
                 
                 if (connection === 'close') {
@@ -363,18 +363,18 @@ io.on('connection', (socket) => {
                                     userJid: state.creds.me.id
                                 });
                                 
-                                // Wait for potential reconnection
+                                // Wait longer for potential reconnection
                                 setTimeout(() => {
                                     if (!connectionEstablished) {
                                         activeSessions.delete(sessionId);
                                         socket.emit('session-connected', {
                                             sessionId,
-                                            message: 'WhatsApp pairing complete! Session saved. You can now use your session ID.',
+                                            message: 'WhatsApp pairing complete! Session saved. Please wait for your phone to finish logging in...',
                                             success: true,
                                             userJid: state.creds.me.id
                                         });
                                     }
-                                }, 5000);
+                                }, 15000); // Wait 15 seconds for full connection
                                 
                                 return; // Don't clean up immediately
                             }
