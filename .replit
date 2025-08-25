@@ -15,19 +15,18 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "MatDev Bot Server"
+args = "MatDev Bot"
 
 [[workflows.workflow]]
-name = "MatDev Bot Server"
+name = "MatDev Bot"
 author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm install && node index.js"
-waitForPort = 5000
+args = "node launcher.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 5000
