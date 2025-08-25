@@ -159,10 +159,7 @@ io.on('connection', (socket) => {
                 browser: ['MatDev Scanner', 'Chrome', '91.0'],
                 connectTimeoutMs: 60000,
                 defaultQueryTimeoutMs: 60000,
-                keepAliveIntervalMs: 30000,
-                logger: {
-                    level: 'silent' // Reduce logging for performance
-                }
+                keepAliveIntervalMs: 30000
             });
             
             // Track active session
