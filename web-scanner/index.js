@@ -140,7 +140,24 @@ async function loadSession(sessionId) {
         const result = await pool.query(query, [sessionId]);
         
         if (result.rows.length > 0) {
-            const rawData = JSON.parse(result.rows[0].session_data);
+            let rawData = result.rows[0].session_data;
+            
+            // Handle different data formats
+            if (typeof rawData === 'string') {
+                try {
+                    rawData = JSON.parse(rawData);
+                } catch (parseError) {
+                    console.error(`Failed to parse session data for ${sessionId}:`, parseError);
+                    return null;
+                }
+            }
+            
+            // Ensure we have the expected structure
+            if (!rawData || !rawData.creds || !rawData.keys) {
+                console.error(`Invalid session data structure for ${sessionId}`);
+                return null;
+            }
+            
             // Deserialize Buffers using BufferJSON
             return {
                 creds: JSON.parse(JSON.stringify(rawData.creds), BufferJSON.reviver),
