@@ -17,13 +17,23 @@ const io = new Server(server, {
     cors: {
         origin: "*",
         methods: ["GET", "POST"]
-    }
+    },
+    transports: ['websocket', 'polling'],
+    pingTimeout: 60000,
+    pingInterval: 25000
 });
 
-// Database connection
+// Session management for concurrent users
+const activeSessions = new Map();
+const MAX_CONCURRENT_SESSIONS = 50;
+
+// Database connection with optimized pool for concurrent users
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    max: 20, // Maximum pool size
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
 });
 
 // Initialize database
@@ -88,11 +98,17 @@ async function loadSession(sessionId) {
 }
 
 // Create database-backed auth state
-function createDatabaseAuthState(sessionId) {
-    const authState = {
-        creds: {},
-        keys: {}
-    };
+async function createDatabaseAuthState(sessionId) {
+    // Check if session already exists in database
+    let authState = await loadSession(sessionId);
+    
+    if (!authState) {
+        // Initialize minimal auth state - let Baileys handle the rest
+        authState = {
+            creds: undefined,
+            keys: undefined
+        };
+    }
     
     return {
         state: authState,
@@ -120,18 +136,37 @@ io.on('connection', (socket) => {
         const { sessionId } = data;
         
         try {
-            console.log(`🔄 Starting session: ${sessionId}`);
+            // Check concurrent session limit
+            if (activeSessions.size >= MAX_CONCURRENT_SESSIONS) {
+                socket.emit('session-error', {
+                    sessionId,
+                    message: 'Server is at capacity. Please try again later.',
+                    error: 'Too many concurrent sessions'
+                });
+                return;
+            }
+            
+            console.log(`🔄 Starting session: ${sessionId} (${activeSessions.size + 1}/${MAX_CONCURRENT_SESSIONS})`);
             
             // Use database-backed auth state instead of file system
-            const { state, saveCreds } = createDatabaseAuthState(sessionId);
+            const { state, saveCreds } = await createDatabaseAuthState(sessionId);
             const { version } = await fetchLatestBaileysVersion();
             
             const sock = makeWASocket({
                 version,
                 auth: state,
                 printQRInTerminal: false,
-                browser: ['MatDev Scanner', 'Chrome', '91.0']
+                browser: ['MatDev Scanner', 'Chrome', '91.0'],
+                connectTimeoutMs: 60000,
+                defaultQueryTimeoutMs: 60000,
+                keepAliveIntervalMs: 30000,
+                logger: {
+                    level: 'silent' // Reduce logging for performance
+                }
             });
+            
+            // Track active session
+            activeSessions.set(sessionId, sock);
             
             sock.ev.on('connection.update', async (update) => {
                 const { connection, lastDisconnect, qr } = update;
@@ -171,6 +206,7 @@ io.on('connection', (socket) => {
                     
                     // Clean up
                     sock.end();
+                    activeSessions.delete(sessionId);
                 }
                 
                 if (connection === 'close') {
@@ -196,11 +232,20 @@ io.on('connection', (socket) => {
                 message: 'Failed to start session',
                 error: error.message
             });
+            activeSessions.delete(sessionId);
         }
     });
     
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
+        // Clean up any hanging sessions for this socket
+        for (const [sessionId, sock] of activeSessions.entries()) {
+            if (sock.socketId === socket.id) {
+                sock.end();
+                activeSessions.delete(sessionId);
+                console.log(`🧹 Cleaned up session: ${sessionId}`);
+            }
+        }
     });
 });
 
