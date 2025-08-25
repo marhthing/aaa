@@ -1,0 +1,17 @@
+{
+  "name": "matdev-web-scanner",
+  "version": "1.0.0",
+  "description": "WhatsApp QR Scanner for MatDev Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.8",
+    "express": "^4.18.2",
+    "qrcode": "^1.5.3",
+    "pg": "^8.11.3",
+    "socket.io": "^4.7.2"
+  }
+}

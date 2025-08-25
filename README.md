@@ -4,13 +4,21 @@ A launcher-based WhatsApp bot similar to Levanter architecture.
 
 ## 🚀 Quick Start
 
-1. **Get Session ID**: Visit your web scanner service (hosted on Vercel/serverless)
-2. **Edit Launcher**: Open `index.js` and replace `updateThis` with your session ID
-3. **Run Bot**: Execute `node index.js`
+### For Bot Users:
+1. **Get Session ID**: Visit the web scanner (hosted separately)
+2. **Download**: Get `index.js` launcher file  
+3. **Edit**: Replace `updateThis` with your session ID
+4. **Run**: Execute `node index.js`
 
 ```javascript
 const SESSION_ID = 'your-unique-session-id' // Edit this line
 ```
+
+### For Bot Developers:
+1. **Upload**: Push this repo to your GitHub
+2. **Deploy Scanner**: Deploy `web-scanner/` folder to Vercel/Netlify  
+3. **Update URL**: Change GitHub URL in `index.js`
+4. **Share**: Give users the `index.js` launcher file
 
 ## 📁 Project Structure
 
@@ -84,10 +92,11 @@ Default prefix: `.`
 
 This bot follows the Levanter architecture:
 
-1. **Separate Scanner**: QR scanning hosted on serverless (Vercel)
-2. **Launcher System**: Simple SESSION_ID configuration
+1. **Separate Scanner**: QR scanning hosted on serverless (Vercel) - see `web-scanner/` folder
+2. **Launcher System**: Simple SESSION_ID configuration in `index.js`
 3. **Plugin Marketplace**: Install from GitHub Gists/URLs
 4. **Terminal Operation**: No web UI, pure console
+5. **Database Sessions**: Sessions created by web scanner, fetched by bot
 
 ## ⚠️ Important
 

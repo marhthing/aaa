@@ -118,17 +118,32 @@ function checkDependencies() {
 }
 
 function cloneRepository() {
-  console.log('Cloning MatDev WhatsApp Bot repository...')
+  console.log('Setting up MatDev WhatsApp Bot...')
+  
+  // For now, use current directory as the bot since repo is not uploaded yet
+  // When you upload to GitHub, change this URL to your actual repository
+  const GITHUB_REPO = 'https://github.com/YOUR_USERNAME/matdev-whatsapp-bot.git'
+  
+  // Try to clone, but if it fails, use current directory
   const cloneResult = spawnSync(
     'git',
-    ['clone', 'https://github.com/yourusername/matdev-whatsapp-bot.git', 'matdev-bot'],
+    ['clone', GITHUB_REPO, 'matdev-bot'],
     {
-      stdio: 'inherit',
+      stdio: 'pipe', // Don't show output to avoid confusing users
     }
   )
 
-  if (cloneResult.error) {
-    throw new Error(`Failed to clone the repository: ${cloneResult.error.message}`)
+  if (cloneResult.error || cloneResult.status !== 0) {
+    console.log('Repository not found, using current directory as bot source...')
+    
+    // Create symbolic link or copy current directory
+    const copyResult = spawnSync('cp', ['-r', '.', 'matdev-bot'], {
+      stdio: 'inherit'
+    })
+    
+    if (copyResult.error) {
+      throw new Error(`Failed to set up bot: ${copyResult.error.message}`)
+    }
   }
 
   const configPath = 'matdev-bot/.env'
