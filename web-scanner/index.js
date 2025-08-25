@@ -100,21 +100,31 @@ async function loadSession(sessionId) {
 // Create database-backed auth state
 async function createDatabaseAuthState(sessionId) {
     // Check if session already exists in database
-    let authState = await loadSession(sessionId);
+    let savedData = await loadSession(sessionId);
     
-    if (!authState) {
-        // Initialize minimal auth state - let Baileys handle the rest
-        authState = {
-            creds: undefined,
-            keys: undefined
-        };
-    }
+    const authState = {
+        creds: savedData?.creds || {},
+        keys: savedData?.keys || {
+            preKeys: {},
+            sessions: {},
+            senderKeys: {},
+            appStateSyncKeys: {},
+            appStateVersions: {},
+            senderKeyMemory: {}
+        }
+    };
+    
+    const saveCreds = async () => {
+        try {
+            await saveSession(sessionId, authState);
+        } catch (error) {
+            console.error(`Failed to save credentials for ${sessionId}:`, error);
+        }
+    };
     
     return {
         state: authState,
-        saveCreds: async () => {
-            await saveSession(sessionId, authState);
-        }
+        saveCreds
     };
 }
 
@@ -159,7 +169,10 @@ io.on('connection', (socket) => {
                 browser: ['MatDev Scanner', 'Chrome', '91.0'],
                 connectTimeoutMs: 60000,
                 defaultQueryTimeoutMs: 60000,
-                keepAliveIntervalMs: 30000
+                keepAliveIntervalMs: 30000,
+                generateHighQualityLinkPreview: true,
+                syncFullHistory: false,
+                markOnlineOnConnect: false
             });
             
             // Track active session
@@ -224,12 +237,15 @@ io.on('connection', (socket) => {
             
         } catch (error) {
             console.error(`Failed to start session ${sessionId}:`, error);
+            
+            // Clean up on error
+            activeSessions.delete(sessionId);
+            
             socket.emit('session-error', {
                 sessionId,
                 message: 'Failed to start session',
                 error: error.message
             });
-            activeSessions.delete(sessionId);
         }
     });
     
