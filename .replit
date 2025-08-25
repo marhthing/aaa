@@ -36,13 +36,13 @@ args = "node index.js"
 name = "Web Scanner"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd web-scanner && node index.js"
-waitForPort = 3000
-
-[workflows.workflow.metadata]
-outputType = "webview"
+waitForPort = 5000
 
 [[ports]]
 localPort = 3000

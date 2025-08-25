@@ -181,12 +181,12 @@ io.on('connection', (socket) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 initDB().then(() => {
     server.listen(PORT, '0.0.0.0', () => {
         console.log(`🌐 MatDev WhatsApp Scanner running on port ${PORT}`);
-        console.log(`📱 Visit: http://localhost:${PORT}`);
+        console.log(`📱 Visit: http://0.0.0.0:${PORT}`);
     });
 }).catch(error => {
     console.error('Failed to start scanner:', error);
