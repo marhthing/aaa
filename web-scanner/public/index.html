@@ -268,14 +268,9 @@
         });
         
         socket.on('session-connected', (data) => {
-            if (data.message.includes('pairing complete')) {
-                showStatus(`🔄 ${data.message} This may take 1-2 minutes.`, 'info');
-                document.getElementById('scanBtn').innerHTML = 'Pairing Complete - Waiting...';
-            } else {
-                showStatus(`✅ ${data.message || 'WhatsApp connected successfully! Use your session ID in the bot launcher.'}`, 'success');
-                document.getElementById('scanBtn').innerHTML = 'Connected ✅';
-                document.getElementById('scanBtn').disabled = false;
-            }
+            showStatus(`✅ ${data.message || 'WhatsApp connected successfully! Use your session ID in the bot launcher.'}`, 'success');
+            document.getElementById('scanBtn').innerHTML = 'Connected ✅';
+            document.getElementById('scanBtn').disabled = false;
             document.getElementById('qrContainer').style.display = 'none';
             
             // Show session ID prominently after successful connection

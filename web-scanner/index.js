@@ -310,20 +310,13 @@ io.on('connection', (socket) => {
                             // Get user's WhatsApp JID
                             const userJid = state.creds?.me?.id;
                             
-                            if (userJid) {
-                                // Send welcome message with session ID after a short delay
-                                setTimeout(async () => {
-                                    await sendWelcomeMessage(sock, sessionId, userJid);
-                                }, 3000);
-                            }
-                            
                             // Save final session to database
                             const saved = await saveSession(sessionId, state);
                             
                             if (saved) {
                                 socket.emit('session-connected', {
                                     sessionId,
-                                    message: 'WhatsApp fully connected! Session saved. Welcome message sent to your WhatsApp.',
+                                    message: 'WhatsApp fully connected! Session saved and ready for bot use.',
                                     success: true,
                                     userJid: userJid
                                 });
@@ -351,7 +344,7 @@ io.on('connection', (socket) => {
                                 console.error(`Error ending socket for ${sessionId}:`, endError);
                             }
                             activeSessions.delete(sessionId);
-                        }, 10000);
+                        }, 5000);
                     }
                 }
                 
@@ -363,7 +356,7 @@ io.on('connection', (socket) => {
                     
                     // Handle stream error (515) - this is expected after pairing
                     if (statusCode === 515 && state.creds?.me?.id && !authenticationComplete) {
-                        console.log(`🔄 Stream error after pairing (expected behavior): ${sessionId}`);
+                        console.log(`✅ Stream error after pairing (this is normal): ${sessionId}`);
                         
                         try {
                             // Save session data immediately after pairing
@@ -372,25 +365,17 @@ io.on('connection', (socket) => {
                             if (saved) {
                                 socket.emit('session-connected', {
                                     sessionId,
-                                    message: 'WhatsApp paired successfully! Your session is saved and ready to use.',
+                                    message: 'WhatsApp paired successfully! Your session is saved and ready to use. No welcome message needed - pairing complete.',
                                     success: true,
                                     userJid: state.creds.me.id
                                 });
                                 
-                                // Send welcome message to user
-                                setTimeout(async () => {
-                                    try {
-                                        await sendWelcomeMessage(sock, sessionId, state.creds.me.id);
-                                        console.log(`📧 Welcome message sent for pairing completion: ${sessionId}`);
-                                    } catch (msgError) {
-                                        console.log(`ℹ️ Could not send welcome message (normal for stream error): ${sessionId}`);
-                                    }
-                                }, 2000);
+                                console.log(`✅ Pairing completed successfully: ${sessionId} - Session ready for bot use`);
                                 
                                 // Clean up session
                                 setTimeout(() => {
                                     activeSessions.delete(sessionId);
-                                }, 5000);
+                                }, 3000);
                                 
                                 return; // Don't continue with error handling
                             }
