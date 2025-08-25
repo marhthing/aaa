@@ -120,7 +120,10 @@ async function saveSession(sessionId, authState) {
                 is_active = true
         `;
         
-        await pool.query(query, [sessionId, JSON.stringify(authState)]);
+        // Ensure proper serialization - authState should already be processed by BufferJSON.replacer
+        const sessionData = typeof authState === 'string' ? authState : JSON.stringify(authState);
+        
+        await pool.query(query, [sessionId, sessionData]);
         console.log(`✅ Session saved: ${sessionId}`);
         
         return true;
@@ -188,7 +191,7 @@ async function createDatabaseAuthState(sessionId) {
                 creds: JSON.parse(JSON.stringify(authState.creds, BufferJSON.replacer)),
                 keys: JSON.parse(JSON.stringify(authState.keys, BufferJSON.replacer))
             };
-            await saveSession(sessionId, serializedData);
+            await saveSession(sessionId, JSON.stringify(serializedData));
         } catch (error) {
             console.error(`Failed to save credentials for ${sessionId}:`, error);
         }
@@ -347,7 +350,11 @@ io.on('connection', (socket) => {
                                 const userJid = state.creds?.me?.id;
                                 
                                 // Save final session to database
-                                const saved = await saveSession(sessionId, state);
+                                const serializedData = {
+                                    creds: JSON.parse(JSON.stringify(state.creds, BufferJSON.replacer)),
+                                    keys: JSON.parse(JSON.stringify(state.keys, BufferJSON.replacer))
+                                };
+                                const saved = await saveSession(sessionId, JSON.stringify(serializedData));
                                 
                                 if (saved) {
                                     // Send welcome message to user's WhatsApp
