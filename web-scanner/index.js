@@ -58,6 +58,40 @@ function generateSessionId() {
     return 'MATDEV_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
+// Customizable welcome message template
+const WELCOME_MESSAGE = `🎉 *MatDev Bot Connected Successfully!*
+
+✅ Your WhatsApp has been linked to MatDev Bot
+🔑 *Session ID:* {{SESSION_ID}}
+🤖 *Bot Name:* MatDev Assistant
+
+*What's Next?*
+• Copy your Session ID above
+• Use it in your bot configuration
+• Start enjoying automated WhatsApp features!
+
+_Thank you for using MatDev Bot! 🚀_
+
+---
+*Keep your Session ID secure and don't share it with others.*`;
+
+// Send welcome message with session ID
+async function sendWelcomeMessage(sock, sessionId, userJid) {
+    try {
+        const message = WELCOME_MESSAGE.replace('{{SESSION_ID}}', sessionId);
+        
+        await sock.sendMessage(userJid, { 
+            text: message 
+        });
+        
+        console.log(`📧 Welcome message sent to: ${userJid}`);
+        return true;
+    } catch (error) {
+        console.error('Failed to send welcome message:', error);
+        return false;
+    }
+}
+
 // Save session to database
 async function saveSession(sessionId, authState) {
     try {
@@ -243,14 +277,23 @@ io.on('connection', (socket) => {
                     console.log(`✅ Session connected: ${sessionId}`);
                     
                     try {
+                        // Get user's WhatsApp JID
+                        const userJid = state.creds?.me?.id;
+                        
+                        if (userJid) {
+                            // Send welcome message with session ID
+                            await sendWelcomeMessage(sock, sessionId, userJid);
+                        }
+                        
                         // Save final session to database
                         const saved = await saveSession(sessionId, state);
                         
                         if (saved) {
                             socket.emit('session-connected', {
                                 sessionId,
-                                message: 'WhatsApp connected successfully! Copy your session ID to use in the bot.',
-                                success: true
+                                message: 'WhatsApp connected successfully! Check your WhatsApp for session details.',
+                                success: true,
+                                userJid: userJid
                             });
                         } else {
                             socket.emit('session-error', {
@@ -268,17 +311,44 @@ io.on('connection', (socket) => {
                         });
                     }
                     
-                    // Clean up
-                    try {
-                        sock.end();
-                    } catch (endError) {
-                        console.error(`Error ending socket for ${sessionId}:`, endError);
-                    }
-                    activeSessions.delete(sessionId);
+                    // Clean up with delay to allow message sending
+                    setTimeout(() => {
+                        try {
+                            sock.end();
+                        } catch (endError) {
+                            console.error(`Error ending socket for ${sessionId}:`, endError);
+                        }
+                        activeSessions.delete(sessionId);
+                    }, 3000); // 3 second delay
                 }
                 
                 if (connection === 'close') {
                     console.log(`🔌 Session closed: ${sessionId}`);
+                    
+                    // Check if this was after successful pairing (stream restart scenario)
+                    if (state.creds?.me?.id) {
+                        console.log(`✅ Pairing completed successfully: ${sessionId}`);
+                        
+                        try {
+                            // Save session data
+                            const saved = await saveSession(sessionId, state);
+                            
+                            if (saved) {
+                                socket.emit('session-connected', {
+                                    sessionId,
+                                    message: 'WhatsApp paired successfully! Session saved. Check your WhatsApp for session details.',
+                                    success: true,
+                                    userJid: state.creds.me.id
+                                });
+                            }
+                        } catch (error) {
+                            console.error(`Failed to save pairing session ${sessionId}:`, error);
+                        }
+                        
+                        // Clean up
+                        activeSessions.delete(sessionId);
+                        return;
+                    }
                     
                     // Clean up on close
                     activeSessions.delete(sessionId);
@@ -286,6 +356,7 @@ io.on('connection', (socket) => {
                     const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
                     const statusCode = lastDisconnect?.error?.output?.statusCode;
                     
+                    // Handle specific error codes
                     if (statusCode === DisconnectReason.badSession) {
                         socket.emit('session-error', {
                             sessionId,
@@ -298,7 +369,8 @@ io.on('connection', (socket) => {
                             message: 'Session logged out',
                             error: 'Logged out'
                         });
-                    } else if (lastDisconnect?.error) {
+                    } else if (lastDisconnect?.error && !shouldReconnect) {
+                        // Only emit error if not a normal restart scenario
                         socket.emit('session-error', {
                             sessionId,
                             message: `Connection failed: ${lastDisconnect.error.message}`,
@@ -340,12 +412,24 @@ io.on('connection', (socket) => {
 // Start server
 const PORT = process.env.PORT || 5000;
 
-initDB().then(() => {
-    server.listen(PORT, '0.0.0.0', () => {
-        console.log(`🌐 MatDev WhatsApp Scanner running on port ${PORT}`);
-        console.log(`📱 Visit: http://0.0.0.0:${PORT}`);
+// For Vercel deployment
+if (process.env.VERCEL) {
+    // Export for Vercel serverless functions
+    module.exports = server;
+} else {
+    // Local development server
+    initDB().then(() => {
+        server.listen(PORT, '0.0.0.0', () => {
+            console.log(`🌐 MatDev WhatsApp Scanner running on port ${PORT}`);
+            console.log(`📱 Visit: http://0.0.0.0:${PORT}`);
+        });
+    }).catch(error => {
+        console.error('Failed to start scanner:', error);
+        process.exit(1);
     });
-}).catch(error => {
-    console.error('Failed to start scanner:', error);
-    process.exit(1);
+}
+
+// Initialize database for both environments
+initDB().catch(error => {
+    console.error('Failed to initialize database:', error);
 });
