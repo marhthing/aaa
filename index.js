@@ -118,8 +118,8 @@ class MatdevBot {
     }
 
     async createNewSession() {
-        const sessionId = await this.promptUser('Enter session name (or press Enter for auto-generated): ');
-        const finalSessionId = sessionId.trim() || `session_${Date.now()}`;
+        const finalSessionId = `session_${Date.now()}`;
+        console.log(`${colors.green}Creating new session: ${finalSessionId}${colors.reset}`);
         
         // Ask for authentication method
         console.log(`\n${colors.blue}Authentication Methods:${colors.reset}`);
