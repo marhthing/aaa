@@ -31,7 +31,7 @@ module.exports = {
   ENABLE_MEDIA_TOOLS: toBool(process.env.ENABLE_MEDIA_TOOLS || 'true'),
   
   // Plugin system
-  PLUGIN_DIR: './plugins_new',
+  PLUGIN_DIR: './plugins',
   EPLUGIN_DIR: './eplugins', // External plugins directory
   ALLOW_EXTERNAL_PLUGINS: toBool(process.env.ALLOW_EXTERNAL_PLUGINS || 'true'),
   
