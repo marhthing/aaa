@@ -1,0 +1,29 @@
+{
+    "name": "anti-view-once",
+    "version": "1.0.0",
+    "description": "Automatically captures and recovers view-once messages",
+    "author": "MATDEV Bot",
+    "category": "privacy",
+    "enabled": true,
+    "commands": [
+        {
+            "name": "vv",
+            "description": "Recover view-once message or set forward destination",
+            "usage": ".vv [jid] - Send last view-once to jid, or set default forward destination",
+            "aliases": ["viewonce", "vo"],
+            "ownerOnly": true
+        }
+    ],
+    "permissions": [
+        "message_access",
+        "media_download",
+        "file_storage"
+    ],
+    "dependencies": [],
+    "settings": {
+        "auto_forward": true,
+        "storage_limit": 10,
+        "capture_images": true,
+        "capture_videos": true
+    }
+}

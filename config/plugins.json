@@ -1,0 +1,281 @@
+{
+  "pluginSystem": {
+    "enabled": true,
+    "autoDiscovery": true,
+    "hotReload": true,
+    "loadOrder": [
+      "core-commands",
+      "admin-tools", 
+      "games",
+      "anti-delete",
+      "media-tools"
+    ],
+    "pluginDirectory": "./src/plugins",
+    "registryFile": ".registry.json",
+    "timeout": 10000,
+    "maxPlugins": 20,
+    "enableSandbox": false
+  },
+  "plugins": {
+    "core-commands": {
+      "enabled": true,
+      "priority": 1,
+      "ownerOnly": true,
+      "autoLoad": true,
+      "dependencies": [],
+      "config": {
+        "enableHelp": true,
+        "enableInfo": true,
+        "enableSettings": true,
+        "enableEnvCommands": true,
+        "enableAllowCommands": true,
+        "maxHelpEntries": 50
+      },
+      "commands": {
+        "help": {
+          "enabled": true,
+          "description": "Show available commands",
+          "usage": ".help [command]",
+          "category": "core"
+        },
+        "info": {
+          "enabled": true,
+          "description": "Show bot information",
+          "usage": ".info",
+          "category": "core"
+        },
+        "settings": {
+          "enabled": true,
+          "description": "Manage bot settings",
+          "usage": ".settings [get|set|list] [key] [value]",
+          "category": "core"
+        },
+        "allow": {
+          "enabled": true,
+          "description": "Allow command for user",
+          "usage": ".allow <command> [user]",
+          "category": "admin"
+        },
+        "env": {
+          "enabled": true,
+          "description": "Manage environment variables",
+          "usage": ".env [get|set|list|add|remove] [key] [value]",
+          "category": "admin"
+        }
+      }
+    },
+    "admin-tools": {
+      "enabled": true,
+      "priority": 2,
+      "ownerOnly": true,
+      "autoLoad": true,
+      "dependencies": ["core-commands"],
+      "config": {
+        "enableUserManager": true,
+        "enableSystemInfo": true,
+        "enableAllowCommands": true,
+        "maxAllowedUsers": 10,
+        "commandCooldown": 1000
+      },
+      "commands": {
+        "status": {
+          "enabled": true,
+          "description": "Show bot status",
+          "usage": ".status",
+          "category": "admin"
+        },
+        "reload": {
+          "enabled": true,
+          "description": "Reload plugins",
+          "usage": ".reload [plugin]",
+          "category": "admin"
+        },
+        "disallow": {
+          "enabled": true,
+          "description": "Remove command permission",
+          "usage": ".disallow <command> [user]",
+          "category": "admin"
+        },
+        "users": {
+          "enabled": true,
+          "description": "Manage users",
+          "usage": ".users [list|block|unblock] [user]",
+          "category": "admin"
+        }
+      }
+    },
+    "games": {
+      "enabled": true,
+      "priority": 3,
+      "ownerOnly": false,
+      "autoLoad": true,
+      "dependencies": [],
+      "config": {
+        "enableTicTacToe": true,
+        "enableWordGuess": true,
+        "enableQuiz": false,
+        "maxPlayersPerGame": 10,
+        "gameTimeout": 600000,
+        "maxActiveGames": 5,
+        "allowSpectators": false,
+        "enableGameHistory": true
+      },
+      "commands": {
+        "tictactoe": {
+          "enabled": true,
+          "description": "Start tic-tac-toe game",
+          "usage": ".tictactoe [@player]",
+          "category": "games",
+          "allowNonOwner": true
+        },
+        "wordguess": {
+          "enabled": true,
+          "description": "Start word guessing game",
+          "usage": ".wordguess [category]",
+          "category": "games",
+          "allowNonOwner": true
+        },
+        "quiz": {
+          "enabled": false,
+          "description": "Start quiz game",
+          "usage": ".quiz [topic]",
+          "category": "games",
+          "allowNonOwner": true
+        }
+      }
+    },
+    "anti-delete": {
+      "enabled": true,
+      "priority": 4,
+      "ownerOnly": true,
+      "autoLoad": true,
+      "dependencies": [],
+      "config": {
+        "enableDetection": true,
+        "enableRecovery": true,
+        "maxRecoveryAge": 86400000,
+        "notifyOnDelete": true,
+        "archiveDeleted": true
+      },
+      "commands": {
+        "recover": {
+          "enabled": true,
+          "description": "Recover deleted message",
+          "usage": ".recover [messageId]",
+          "category": "admin"
+        },
+        "deleted": {
+          "enabled": true,
+          "description": "Show recent deleted messages",
+          "usage": ".deleted [count]",
+          "category": "admin"
+        }
+      }
+    },
+    "media-tools": {
+      "enabled": false,
+      "priority": 5,
+      "ownerOnly": true,
+      "autoLoad": false,
+      "dependencies": [],
+      "config": {
+        "enableConverter": false,
+        "enableUpscaler": false,
+        "enableAnalyzer": true,
+        "maxFileSize": 52428800,
+        "supportedFormats": ["jpg", "png", "gif", "mp4", "mp3", "wav"],
+        "outputDirectory": "./data/media/processed"
+      },
+      "commands": {
+        "convert": {
+          "enabled": false,
+          "description": "Convert media format",
+          "usage": ".convert <format>",
+          "category": "media"
+        },
+        "upscale": {
+          "enabled": false,
+          "description": "Upscale image/video",
+          "usage": ".upscale [factor]",
+          "category": "media"
+        },
+        "analyze": {
+          "enabled": true,
+          "description": "Analyze media file",
+          "usage": ".analyze",
+          "category": "media"
+        }
+      }
+    }
+  },
+  "categories": {
+    "core": {
+      "name": "Core Commands",
+      "description": "Essential bot commands",
+      "icon": "⚙️",
+      "color": "#007bff"
+    },
+    "admin": {
+      "name": "Admin Tools",
+      "description": "Administrative commands",
+      "icon": "🔧",
+      "color": "#dc3545"
+    },
+    "games": {
+      "name": "Games",
+      "description": "Interactive games",
+      "icon": "🎮",
+      "color": "#28a745"
+    },
+    "media": {
+      "name": "Media Tools",
+      "description": "Media processing tools",
+      "icon": "📷",
+      "color": "#ffc107"
+    },
+    "tools": {
+      "name": "Utility Tools",
+      "description": "Various utility commands",
+      "icon": "🛠️",
+      "color": "#6f42c1"
+    },
+    "fun": {
+      "name": "Fun Commands",
+      "description": "Entertainment commands",
+      "icon": "🎉",
+      "color": "#fd7e14"
+    }
+  },
+  "security": {
+    "validatePlugins": true,
+    "requireManifest": true,
+    "enableSandbox": false,
+    "allowDynamicRequire": false,
+    "maxExecutionTime": 10000,
+    "memoryLimit": 50,
+    "fileSystemAccess": "restricted"
+  },
+  "development": {
+    "enableDebugMode": false,
+    "verboseLogging": false,
+    "enableMetrics": true,
+    "enableProfiling": false,
+    "watchForChanges": true,
+    "reloadOnChange": true
+  },
+  "performance": {
+    "cachePlugins": true,
+    "preloadPlugins": true,
+    "parallelLoading": true,
+    "maxConcurrentPlugins": 5,
+    "enableLazyLoading": false,
+    "pluginTimeout": 10000
+  },
+  "logging": {
+    "logPluginEvents": true,
+    "logCommandExecution": true,
+    "logErrors": true,
+    "logPerformance": false,
+    "logLevel": "info"
+  }
+}

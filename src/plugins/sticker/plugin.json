@@ -1,0 +1,59 @@
+{
+  "name": "sticker",
+  "displayName": "Sticker Converter",
+  "description": "Convert images, videos, and GIFs to WhatsApp stickers",
+  "version": "1.0.0",
+  "author": "MatDev",
+  "enabled": true,
+  "ownerOnly": false,
+  "priority": 15,
+  "category": "media",
+  "dependencies": [
+    "sharp",
+    "fluent-ffmpeg",
+    "fs-extra"
+  ],
+  "commands": [
+    {
+      "name": "sticker",
+      "description": "Convert replied image/video/GIF to sticker",
+      "usage": "sticker (reply to media)",
+      "ownerOnly": false,
+      "examples": [
+        "Reply to an image: .sticker",
+        "Reply to a video: .sticker",
+        "Reply to a GIF: .sticker"
+      ]
+    },
+    {
+      "name": "s",
+      "description": "Short command for sticker conversion",
+      "usage": "s (reply to media)",
+      "ownerOnly": false,
+      "examples": [
+        "Reply to media: .s"
+      ]
+    }
+  ],
+  "features": [
+    "image-to-sticker",
+    "video-to-animated-sticker",
+    "gif-to-animated-sticker",
+    "auto-resize",
+    "webp-conversion"
+  ],
+  "permissions": [
+    "media:read",
+    "media:write",
+    "storage:temp"
+  ],
+  "settings": {
+    "maxDuration": 10,
+    "outputSize": 512,
+    "quality": 90
+  },
+  "metadata": {
+    "created": "2025-08-24T00:00:00.000Z",
+    "tags": ["sticker", "media", "converter", "webp", "whatsapp"]
+  }
+}

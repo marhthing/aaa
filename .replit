@@ -1,9 +1,11 @@
 modules = ["nodejs-20"]
+run = "node index.js"
 [agent]
 expertMode = true
 
 [nix]
 channel = "stable-25_05"
+packages = ["glib", "gtk3", "nss", "libdrm", "mesa", "chromium", "unzipNLS"]
 
 [workflows]
 runButton = "Project"
@@ -15,10 +17,10 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "MatDev Bot"
+args = "MATDEV Bot"
 
 [[workflows.workflow]]
-name = "MatDev Bot"
+name = "MATDEV Bot"
 author = "agent"
 
 [[workflows.workflow.tasks]]
@@ -28,14 +30,5 @@ args = "node index.js"
 [workflows.workflow.metadata]
 outputType = "console"
 
-[[ports]]
-localPort = 3000
-externalPort = 3000
-
-[[ports]]
-localPort = 5000
-externalPort = 80
-
 [deployment]
-deploymentTarget = "vm"
-run = ["node", "index.js"]
+run = ["sh", "-c", "node index.js"]

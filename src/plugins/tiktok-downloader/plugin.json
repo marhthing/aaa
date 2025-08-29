@@ -1,0 +1,30 @@
+{
+  "name": "tiktok-downloader",
+  "displayName": "TikTok Downloader",
+  "description": "Downloads TikTok videos from a provided URL without a watermark.",
+  "version": "1.0.0",
+  "author": "Your Name",
+  "enabled": true,
+  "ownerOnly": false,
+  "priority": 10,
+  "category": "media",
+  "dependencies": ["@tobyg74/tiktok-api-dl"],
+  "commands": [
+    {
+      "name": "tiktok",
+      "description": "Downloads a TikTok video.",
+      "usage": "tiktok <url>",
+      "ownerOnly": false,
+      "examples": [
+        ".tiktok https://vt.tiktok.com/ZSjR1vV3a/"
+      ]
+    }
+  ],
+  "features": [],
+  "permissions": ["storage:write"],
+  "settings": {},
+  "metadata": {
+    "created": "2025-08-18T10:15:00.000Z",
+    "tags": ["tiktok", "video", "downloader"]
+  }
+}
