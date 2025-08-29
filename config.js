@@ -16,7 +16,7 @@ module.exports = {
   WHATSAPP_SESSION_ID: process.env.WHATSAPP_SESSION_ID || 'session_1',
 
   // Directory configuration
-  SESSION_DIR: process.env.SESSION_DIR || path.join(__dirname, 'sessions', process.env.WHATSAPP_SESSION_ID || 'session_1'),
+  SESSION_DIR: process.env.SESSION_DIR || path.join(__dirname, 'sessions'),
   PHONE_NUMBER: process.env.PHONE_NUMBER || '',
   OWNER_JID: process.env.OWNER_JID || '',
   AUTH_METHOD: process.env.AUTH_METHOD || '1',
