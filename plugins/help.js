@@ -12,9 +12,8 @@ module.exports = {
     fromMe: false,
     type: 'whatsapp',
     
-    async function(message, match, bot) {
+    async execute(bot, message, args) {
         try {
-            const args = match ? match.trim().split(' ') : [];
             const specificCommand = args[0];
             
             if (specificCommand) {

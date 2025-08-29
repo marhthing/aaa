@@ -13,7 +13,7 @@ module.exports = {
     type: 'whatsapp',
     cooldown: 5,
     
-    async function(message, match, bot) {
+    async execute(bot, message, args) {
         try {
             const startTime = Date.now();
             
@@ -24,12 +24,18 @@ module.exports = {
             const responseTime = endTime - startTime;
             
             // Get system information
-            const stats = bot.getStats();
-            const uptime = this.formatUptime(stats.uptime);
-            const memoryUsage = this.formatMemoryUsage(stats.memoryUsage);
+            const stats = {
+                uptime: process.uptime(),
+                memoryUsage: process.memoryUsage(),
+                isConnected: bot.isConnected,
+                pluginCount: bot.pluginManager ? bot.pluginManager.getLoadedPlugins().length : 0,
+                platform: bot.config.PLATFORM || 'unknown'
+            };
+            const uptime = module.exports.formatUptime(stats.uptime);
+            const memoryUsage = module.exports.formatMemoryUsage(stats.memoryUsage);
             
             // Get database status
-            const dbHealth = await this.checkDatabaseHealth(bot);
+            const dbHealth = await module.exports.checkDatabaseHealth(bot);
             
             // Create detailed response
             let pingText = `🏓 *Pong!*\n\n`;
@@ -42,7 +48,7 @@ module.exports = {
             pingText += `🌐 *Platform:* ${stats.platform}\n\n`;
             
             // Performance indicators
-            const performance = this.getPerformanceIndicator(responseTime);
+            const performance = module.exports.getPerformanceIndicator(responseTime);
             pingText += `📈 *Performance:* ${performance.emoji} ${performance.text}\n\n`;
             
             // Additional stats
