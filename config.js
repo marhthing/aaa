@@ -16,8 +16,8 @@ const defaultConfig = {
     BOT_LANG: process.env.BOT_LANG || 'en',
     
     // Database Configuration
-    DATABASE_URL: process.env.DATABASE_URL || 'sqlite:./data/matdev.db',
-    DB_TYPE: process.env.NODE_ENV === 'production' ? 'postgres' : 'sqlite',
+    DATABASE_URL: process.env.DATABASE_URL || 'json:./data/matdev.json',
+    DB_TYPE: process.env.DATABASE_URL ? (process.env.DATABASE_URL.startsWith('postgres') ? 'postgres' : 'json') : 'json',
     
     // Bot Behavior
     AUTO_READ: process.env.AUTO_READ === 'true',
@@ -55,6 +55,7 @@ const defaultConfig = {
  * Detect hosting platform
  */
 function detectPlatform() {
+    if (process.env.REPLIT_DOMAINS) return 'replit';
     if (process.env.DYNO) return 'heroku';
     if (process.env.KOYEB_APP_NAME) return 'koyeb';
     if (process.env.RAILWAY_ENVIRONMENT) return 'railway';

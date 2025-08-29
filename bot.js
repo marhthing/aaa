@@ -14,18 +14,10 @@ const logger = require('./lib/utils/logger');
  */
 async function main() {
     try {
-        // Validate SESSION_ID
-        if (!process.env.SESSION_ID || process.env.SESSION_ID === 'updateThis') {
-            console.error('❌ SESSION_ID not configured!');
-            console.error('   Please set SESSION_ID in your environment or .env file');
-            console.error('   Get your session ID from your web scanner service');
-            process.exit(1);
-        }
-        
         logger.info('🚀 Starting MatDev WhatsApp Bot...');
-        logger.info(`📱 Using SESSION_ID: ${process.env.SESSION_ID}`);
+        logger.info('📱 Checking for existing session...');
         
-        // Create bot instance
+        // Create bot instance - it will handle session detection and linking
         const bot = new Bot(config);
         
         // Handle process termination
@@ -52,11 +44,10 @@ async function main() {
             process.exit(1);
         });
         
-        // Start the bot
+        // Start the bot with automatic session handling
         await bot.start();
         
         logger.info('✅ MatDev WhatsApp Bot is running!');
-        logger.info('📱 Scan the QR code with WhatsApp to connect');
         
     } catch (error) {
         logger.error('Failed to start MatDev Bot:', error);

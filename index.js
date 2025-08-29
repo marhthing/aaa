@@ -2,7 +2,7 @@ const { spawnSync, spawn } = require('child_process')
 const { existsSync, writeFileSync } = require('fs')
 const path = require('path')
 
-const SESSION_ID = 'updateThis' // Edit this line only, don't remove ' <- this symbol
+// Session will be managed automatically by the bot - no manual configuration needed
 
 let nodeRestartCount = 0
 const maxNodeRestarts = 5
@@ -10,7 +10,7 @@ const restartWindow = 30000 // 30 seconds
 let lastRestartTime = Date.now()
 
 function startNode() {
-  const child = spawn('node', ['bot.js'], { cwd: 'matdev-bot', stdio: 'inherit' })
+  const child = spawn('node', ['bot.js'], { stdio: 'inherit' })
 
   child.on('exit', (code) => {
     if (code !== 0) {
@@ -79,12 +79,11 @@ function startPm2() {
 }
 
 function installDependencies() {
-  console.log('Installing dependencies...')
+  console.log('Checking dependencies...')
   const installResult = spawnSync(
     'npm',
     ['install', '--force', '--no-audit'],
     {
-      cwd: 'matdev-bot',
       stdio: 'inherit',
       env: { ...process.env, CI: 'true' }
     }
@@ -101,13 +100,12 @@ function installDependencies() {
 }
 
 function checkDependencies() {
-  if (!existsSync(path.resolve('matdev-bot/package.json'))) {
+  if (!existsSync(path.resolve('package.json'))) {
     console.error('package.json not found!')
     process.exit(1)
   }
 
   const result = spawnSync('npm', ['ls', '--depth=0'], {
-    cwd: 'matdev-bot',
     stdio: 'pipe',
   })
 
@@ -117,76 +115,28 @@ function checkDependencies() {
   }
 }
 
-function cloneRepository() {
-  console.log('Setting up MatDev WhatsApp Bot...')
+// Git repository cloning disabled - using current directory code
+function setupBot() {
+  console.log('Setting up MatDev WhatsApp Bot from current directory...')
   
-  // For now, use current directory as the bot since repo is not uploaded yet
-  // When you upload to GitHub, change this URL to your actual repository
-  const GITHUB_REPO = 'https://github.com/YOUR_USERNAME/matdev-whatsapp-bot.git'
+  // Comment: Repository cloning is disabled since code is already present
+  // const GITHUB_REPO = 'https://github.com/YOUR_USERNAME/matdev-whatsapp-bot.git'
   
-  // Try to clone, but if it fails, use current directory
-  const cloneResult = spawnSync(
-    'git',
-    ['clone', GITHUB_REPO, 'matdev-bot'],
-    {
-      stdio: 'pipe', // Don't show output to avoid confusing users
-    }
-  )
-
-  if (cloneResult.error || cloneResult.status !== 0) {
-    console.log('Repository not found, using current directory as bot source...')
-    
-    // Create symbolic link or copy current directory
-    const copyResult = spawnSync('cp', ['-r', '.', 'matdev-bot'], {
-      stdio: 'inherit'
-    })
-    
-    if (copyResult.error) {
-      throw new Error(`Failed to set up bot: ${copyResult.error.message}`)
-    }
-  }
-
-  const configPath = 'matdev-bot/.env'
-  try {
-    console.log('Writing configuration...')
-    writeFileSync(configPath, `SESSION_ID=${SESSION_ID}
-PREFIX=.
-BOT_NAME=MatDev
-BOT_LANG=en
-AUTO_READ=false
-AUTO_ONLINE=true
-REJECT_CALLS=true
-LOG_LEVEL=info
-NODE_ENV=production
-DATABASE_URL=${process.env.DATABASE_URL || 'sqlite:./data/matdev.db'}`)
-  } catch (err) {
-    throw new Error(`Failed to write to .env: ${err.message}`)
-  }
-
+  console.log('✅ Using current directory as bot source')
+  
+  // No need to copy - we're using the current directory directly
+  // Just ensure dependencies are installed
   installDependencies()
 }
 
-function validateSessionId() {
-  if (SESSION_ID === 'updateThis') {
-    console.error('❌ Please edit the SESSION_ID in index.js before running!')
-    console.error('   Change "updateThis" to your actual session ID from the web scanner.')
-    console.error('   Get your session ID from: https://your-scanner-site.vercel.app')
-    process.exit(1)
-  }
-  console.log(`✅ Using SESSION_ID: ${SESSION_ID}`)
-}
+// Session validation removed - bot will handle session linking automatically
 
 console.log('🚀 MatDev WhatsApp Bot Launcher')
 console.log('================================')
 
-validateSessionId()
+// Session validation removed - bot handles linking automatically
 
-if (!existsSync('matdev-bot')) {
-  cloneRepository()
-  checkDependencies()
-} else {
-  checkDependencies()
-}
+setupBot()
 
 console.log('🔌 Starting WhatsApp bot...')
-startPm2()
+startNode()

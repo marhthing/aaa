@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web", "postgresql-16"]
+modules = ["nodejs-20", "web"]
 [agent]
 expertMode = true
 
@@ -17,32 +17,16 @@ author = "agent"
 task = "workflow.run"
 args = "MatDev Bot"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Web Scanner"
-
 [[workflows.workflow]]
 name = "MatDev Bot"
 author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node index.js"
 
-[[workflows.workflow]]
-name = "Web Scanner"
-author = "agent"
-
 [workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd web-scanner && node index.js"
-waitForPort = 5000
+outputType = "console"
 
 [[ports]]
 localPort = 3000
