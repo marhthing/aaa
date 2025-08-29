@@ -6,6 +6,15 @@ MatDev is a professional WhatsApp bot built with Node.js that provides advanced 
 
 Preferred communication style: Simple, everyday language.
 
+# Recent Changes
+
+## August 29, 2025
+- **Storage System Redesign**: Modified database configuration to use JSON files by default instead of PostgreSQL
+- **JSON Storage Implementation**: Created comprehensive JSON fallback system for all database operations
+- **Configuration Update**: Added FORCE_DATABASE flag to optionally enable PostgreSQL when needed
+- **Automatic Detection**: Bot now automatically uses JSON mode unless database is explicitly configured
+- **File Structure**: Messages and settings stored in `data/database.json` and `data/settings.json`
+
 # System Architecture
 
 ## Core Architecture
@@ -15,7 +24,7 @@ The bot follows a modular class-based architecture with clear separation of conc
 - **Message Class**: Processes incoming messages with reply capabilities and permission checking
 - **Command Class**: Manages command registration, execution, and middleware pipeline
 - **Plugin Class**: Dynamic plugin loading system with hot-reload support for development
-- **Database Class**: Sequelize-based ORM handling data persistence with support for both SQLite and PostgreSQL
+- **Database Class**: Flexible data persistence layer supporting JSON files and SQL databases with automatic fallback
 
 ## Plugin System
 Features a comprehensive plugin architecture where each plugin is a self-contained module with:
@@ -26,14 +35,11 @@ Features a comprehensive plugin architecture where each plugin is a self-contain
 - Multi-language support integration
 
 ## Database Design
-Uses Sequelize ORM with models for:
-- **Users**: WhatsApp user profiles, bans, VIP status, preferences
-- **Groups**: WhatsApp group metadata, settings, participant tracking  
-- **Sessions**: WhatsApp connection session management
-- **GameSessions**: Multi-player game state management
-- **PlayerStats**: User gaming statistics and achievements
-- **Logs**: System activity and error logging
-- **Settings**: Bot configuration storage
+**Storage System**: JSON-based by default, PostgreSQL optional
+- **Default Mode**: JSON files stored in `data/database.json` and `data/settings.json`
+- **Database Mode**: Available when `FORCE_DATABASE=true` is set in environment
+- **Data Models**: Users, Groups, Sessions, GameSessions, PlayerStats, Logs, Settings
+- **Automatic Fallback**: Seamlessly switches between JSON and SQL modes without code changes
 
 ## Multi-Language Support
 JSON-based localization system supporting multiple languages (English, Arabic, Spanish, French) with template-based message formatting and per-user language preferences.

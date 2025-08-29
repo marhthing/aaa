@@ -15,9 +15,10 @@ const defaultConfig = {
     BOT_NAME: process.env.BOT_NAME || 'MatDev',
     BOT_LANG: process.env.BOT_LANG || 'en',
     
-    // Database Configuration
-    DATABASE_URL: process.env.DATABASE_URL || 'json:./data/matdev.json',
-    DB_TYPE: process.env.DATABASE_URL ? (process.env.DATABASE_URL.startsWith('postgres') ? 'postgres' : 'json') : 'json',
+    // Database Configuration - Use JSON by default, only use database if explicitly configured
+    DATABASE_URL: process.env.FORCE_DATABASE === 'true' ? process.env.DATABASE_URL : '',
+    DB_TYPE: (process.env.FORCE_DATABASE === 'true' && process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') ? 
+             (process.env.DATABASE_URL.startsWith('postgres') ? 'postgres' : 'other') : 'json',
     
     // Bot Behavior
     AUTO_READ: process.env.AUTO_READ === 'true',
