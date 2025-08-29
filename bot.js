@@ -35,13 +35,15 @@ async function main() {
         
         // Handle uncaught exceptions
         process.on('uncaughtException', (error) => {
+            console.error('❌ Uncaught Exception:', error.message);
             logger.error('Uncaught Exception:', error);
-            process.exit(1);
+            // Don't exit immediately, let the bot try to recover
         });
         
         process.on('unhandledRejection', (reason, promise) => {
+            console.error('❌ Unhandled Promise Rejection:', reason);
             logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-            process.exit(1);
+            // Don't exit immediately, let the bot try to recover
         });
         
         // Start the bot with automatic session handling
