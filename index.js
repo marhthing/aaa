@@ -255,7 +255,7 @@ class MatdevBot {
         process.env.PHONE_NUMBER = sessionConfig.phoneNumber || '';
         process.env.OWNER_JID = sessionConfig.ownerJid || '';
         process.env.AUTH_METHOD = sessionConfig.authMethod;
-        process.env.SESSION_DIR = this.sessionsDir;
+        process.env.SESSION_DIR = path.join(this.sessionsDir, sessionConfig.id);
 
         console.log(`${colors.cyan}🔧 Environment variables configured${colors.reset}`);
         console.log(`${colors.cyan}📂 Session directory: ${path.relative(process.cwd(), path.join(this.sessionsDir, sessionConfig.id))}${colors.reset}\n`);
