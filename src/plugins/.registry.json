@@ -1,0 +1,106 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2025-08-29T18:05:02.400Z",
+  "plugins": [
+    {
+      "name": "admin-tools",
+      "version": "1.0.0",
+      "enabled": true,
+      "loadedAt": "2025-08-24T15:33:12.233Z",
+      "commands": [
+        "systeminfo",
+        "plugins",
+        "users",
+        "permissions",
+        "logs",
+        "cleanup",
+        "backup"
+      ]
+    },
+    {
+      "name": "anti-delete",
+      "version": "2.0.0",
+      "enabled": true,
+      "loadedAt": "2025-08-24T15:33:12.284Z",
+      "commands": [
+        "delete"
+      ]
+    },
+    {
+      "name": "core-commands",
+      "version": "2.0.0",
+      "enabled": true,
+      "loadedAt": "2025-08-24T15:33:12.287Z",
+      "commands": [
+        "help",
+        "info",
+        "status",
+        "settings",
+        "allow",
+        "disallow",
+        "reload",
+        "env",
+        "shutdown",
+        "restart",
+        "menu"
+      ]
+    },
+    {
+      "name": "enhance",
+      "version": "1.0.0",
+      "enabled": true,
+      "loadedAt": "2025-08-24T15:33:12.297Z",
+      "commands": [
+        "enhance",
+        "enhancestatus"
+      ]
+    },
+    {
+      "name": "jid",
+      "version": "1.0.0",
+      "enabled": true,
+      "loadedAt": "2025-08-24T15:33:12.301Z",
+      "commands": [
+        "jid"
+      ]
+    },
+    {
+      "name": "sticker",
+      "version": "1.0.0",
+      "enabled": true,
+      "loadedAt": "2025-08-24T15:33:12.927Z",
+      "commands": [
+        "sticker",
+        "s"
+      ]
+    },
+    {
+      "name": "tiktok-downloader",
+      "version": "1.0.0",
+      "enabled": true,
+      "loadedAt": "2025-08-24T15:33:12.964Z",
+      "commands": [
+        "tiktok"
+      ]
+    },
+    {
+      "name": "youtube-downloader",
+      "version": "1.0.0",
+      "enabled": true,
+      "loadedAt": "2025-08-24T15:33:13.588Z",
+      "commands": [
+        "ytv"
+      ]
+    },
+    {
+      "name": "ping",
+      "version": "1.0.0",
+      "enabled": true,
+      "loadedAt": "2025-08-29T18:05:02.399Z",
+      "commands": [
+        "ping",
+        "pinginfo"
+      ]
+    }
+  ]
+}

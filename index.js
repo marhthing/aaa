@@ -1,8 +1,14 @@
-const { Client, logger } = require('./lib/client')
-const config = require('./config')
-const fs = require('fs-extra')
-const path = require('path')
-const readline = require('readline')
+#!/usr/bin/env node
+
+/**
+ * MATDEV Bot - Unified Entry Point
+ * Streamlined startup process with stage-by-stage execution
+ */
+
+const fs = require('fs').promises;
+const path = require('path');
+const readline = require('readline');
+const { spawn } = require('child_process');
 
 // ANSI color codes for console output
 const colors = {
@@ -16,65 +22,110 @@ const colors = {
     magenta: '\x1b[35m'
 };
 
-class MatdevBot {
+class MatdevBotLauncher {
     constructor() {
+        this.packageJsonPath = path.join(process.cwd(), 'package.json');
+        this.nodeModulesPath = path.join(process.cwd(), 'node_modules');
         this.sessionsDir = path.join(__dirname, 'sessions');
+        this.dataDir = path.join(__dirname, 'data');
+        this.configDir = path.join(__dirname, 'config');
         this.rl = readline.createInterface({
             input: process.stdin,
             output: process.stdout
         });
     }
 
-    async start() {
+    async launch() {
         try {
             console.log(`${colors.cyan}${colors.bright}`);
             console.log('╔══════════════════════════════════════════════╗');
             console.log('║                 MATDEV Bot                   ║');
-            console.log('║           Levanter Architecture              ║');
+            console.log('║           Unified Launcher v2.0              ║');
             console.log('╚══════════════════════════════════════════════╝');
             console.log(`${colors.reset}\n`);
 
-            // Check if session is already configured
-            if (config.WHATSAPP_SESSION_ID && await this.sessionExists(config.WHATSAPP_SESSION_ID)) {
-                logger.info(`Using existing session: ${config.WHATSAPP_SESSION_ID}`);
-                await this.startBot();
-                return;
-            }
-
-            // Setup session management
-            await this.setupDirectories();
-            await this.sessionManagement();
+            // Stage 1: Package Management
+            await this.stage1_PackageManagement();
+            
+            // Stage 2: Directory Setup
+            await this.stage2_DirectorySetup();
+            
+            // Stage 3: Session Management
+            await this.stage3_SessionManagement();
 
         } catch (error) {
-            logger.error('Failed to start bot:', error);
+            console.error(`${colors.red}Launch failed:${colors.reset}`, error.message);
             process.exit(1);
         }
     }
 
-    async setupDirectories() {
+    async stage1_PackageManagement() {
+        console.log(`${colors.blue}${colors.bright}Stage 1: Package Management${colors.reset}`);
+        console.log('─'.repeat(50));
+        
+        try {
+            // Check if package.json exists
+            const packageExists = await this.fileExists(this.packageJsonPath);
+            if (!packageExists) {
+                console.log(`${colors.red}❌ package.json not found${colors.reset}`);
+                throw new Error('package.json is required');
+            }
+
+            // Check if node_modules exists
+            const nodeModulesExists = await this.fileExists(this.nodeModulesPath);
+            
+            if (!nodeModulesExists) {
+                console.log(`${colors.yellow}📦 Installing packages...${colors.reset}`);
+                await this.runCommand('npm', ['install']);
+                console.log(`${colors.green}✅ Packages installed successfully${colors.reset}`);
+            } else {
+                console.log(`${colors.yellow}🔍 Checking package dependencies...${colors.reset}`);
+                const outdated = await this.checkOutdatedPackages();
+                if (outdated.length > 0) {
+                    console.log(`${colors.yellow}📦 Updating outdated packages...${colors.reset}`);
+                    await this.runCommand('npm', ['update']);
+                    console.log(`${colors.green}✅ Packages updated successfully${colors.reset}`);
+                } else {
+                    console.log(`${colors.green}✅ All packages are up to date${colors.reset}`);
+                }
+            }
+        } catch (error) {
+            console.error(`${colors.red}❌ Package management failed:${colors.reset}`, error.message);
+            throw error;
+        }
+        
+        console.log();
+    }
+
+    async stage2_DirectorySetup() {
+        console.log(`${colors.blue}${colors.bright}Stage 2: Directory Setup${colors.reset}`);
+        console.log('─'.repeat(50));
+        
         const dirs = [
             this.sessionsDir,
-            config.DOWNLOAD_DIR,
-            config.PLUGIN_DIR,
-            config.EPLUGIN_DIR,
-            path.join(__dirname, 'data'),
-            path.join(__dirname, 'data/media'),
-            path.join(__dirname, 'temp')
+            this.dataDir,
+            this.configDir,
+            path.join(this.dataDir, 'messages'),
+            path.join(this.dataDir, 'media'),
+            path.join(this.dataDir, 'plugins'),
+            path.join(this.dataDir, 'system')
         ];
 
         for (const dir of dirs) {
             try {
-                await fs.ensureDir(dir);
-                console.log(`${colors.green}✅ Directory ready: ${path.relative(process.cwd(), dir)}${colors.reset}`);
-            } catch (error) {
+                await fs.access(dir);
+                console.log(`${colors.green}✅ Directory exists: ${path.relative(process.cwd(), dir)}${colors.reset}`);
+            } catch {
+                await fs.mkdir(dir, { recursive: true });
                 console.log(`${colors.cyan}📁 Created directory: ${path.relative(process.cwd(), dir)}${colors.reset}`);
             }
         }
+        
         console.log();
     }
 
-    async sessionManagement() {
-        console.log(`${colors.blue}${colors.bright}Session Management${colors.reset}`);
+    async stage3_SessionManagement() {
+        console.log(`${colors.blue}${colors.bright}Stage 3: WhatsApp Session Management${colors.reset}`);
         console.log('─'.repeat(50));
         
         // Check for existing sessions
@@ -84,9 +135,9 @@ class MatdevBot {
             console.log(`${colors.yellow}No existing sessions found. Creating new session...${colors.reset}`);
             await this.createNewSession();
         } else if (sessions.length === 1) {
-            // Auto-select the only available session
+            // Auto-select the only available session for seamless restarts
             console.log(`${colors.green}Found existing session: ${sessions[0].id}${colors.reset}`);
-            console.log(`${colors.cyan}🚀 Auto-selecting session...${colors.reset}`);
+            console.log(`${colors.cyan}🚀 Auto-selecting session for seamless restart...${colors.reset}`);
             await this.startSession(sessions[0]);
         } else {
             // Multiple sessions - let user choose
@@ -100,8 +151,9 @@ class MatdevBot {
             const registryPath = path.join(this.sessionsDir, 'session_registry.json');
             
             try {
-                const registryData = await fs.readJSON(registryPath);
-                return registryData.sessions || [];
+                const registryData = await fs.readFile(registryPath, 'utf8');
+                const registry = JSON.parse(registryData);
+                return registry.sessions || [];
             } catch {
                 return [];
             }
@@ -111,15 +163,9 @@ class MatdevBot {
         }
     }
 
-    async sessionExists(sessionId) {
-        const sessionDir = path.join(this.sessionsDir, sessionId);
-        const authDir = path.join(sessionDir, 'auth');
-        return await fs.pathExists(authDir);
-    }
-
     async createNewSession() {
-        const finalSessionId = `session_${Date.now()}`;
-        console.log(`${colors.green}Creating new session: ${finalSessionId}${colors.reset}`);
+        const sessionId = await this.promptUser('Enter session name (or press Enter for auto-generated): ');
+        const finalSessionId = sessionId.trim() || `session_${Date.now()}`;
         
         // Ask for authentication method
         console.log(`\n${colors.blue}Authentication Methods:${colors.reset}`);
@@ -173,14 +219,14 @@ class MatdevBot {
     }
 
     async initializeSession(sessionId, phoneNumber, authMethod) {
-        console.log(`${colors.blue}${colors.bright}Session Initialization${colors.reset}`);
+        console.log(`${colors.blue}${colors.bright}Stage 4: Session Initialization${colors.reset}`);
         console.log('─'.repeat(50));
         
         const sessionDir = path.join(this.sessionsDir, sessionId);
         
         try {
-            await fs.ensureDir(sessionDir);
-            await fs.ensureDir(path.join(sessionDir, 'auth'));
+            await fs.mkdir(sessionDir, { recursive: true });
+            await fs.mkdir(path.join(sessionDir, 'auth'), { recursive: true });
 
             // Create session config
             const sessionConfig = {
@@ -193,10 +239,23 @@ class MatdevBot {
                 lastActive: new Date().toISOString()
             };
 
-            await fs.writeJSON(
+            await fs.writeFile(
                 path.join(sessionDir, 'config.json'),
-                sessionConfig,
-                { spaces: 2 }
+                JSON.stringify(sessionConfig, null, 2)
+            );
+
+            // Create metadata
+            const metadata = {
+                SESSION_ID: sessionId,
+                PHONE_NUMBER: phoneNumber,
+                OWNER_JID: null,
+                AUTH_METHOD: authMethod,
+                version: '1.0.0'
+            };
+
+            await fs.writeFile(
+                path.join(sessionDir, 'metadata.json'),
+                JSON.stringify(metadata, null, 2)
             );
 
             // Update session registry
@@ -217,7 +276,8 @@ class MatdevBot {
         let registry = { sessions: [] };
         
         try {
-            registry = await fs.readJSON(registryPath);
+            const registryData = await fs.readFile(registryPath, 'utf8');
+            registry = JSON.parse(registryData);
         } catch {
             // Registry doesn't exist, will create new one
         }
@@ -230,11 +290,11 @@ class MatdevBot {
             registry.sessions.push(sessionConfig);
         }
 
-        await fs.writeJSON(registryPath, registry, { spaces: 2 });
+        await fs.writeFile(registryPath, JSON.stringify(registry, null, 2));
     }
 
     async startSession(sessionConfig) {
-        console.log(`${colors.blue}${colors.bright}Bot Launch${colors.reset}`);
+        console.log(`${colors.blue}${colors.bright}Stage 5: Bot Launch${colors.reset}`);
         console.log('─'.repeat(50));
         
         console.log(`${colors.green}🚀 Starting session: ${sessionConfig.id}${colors.reset}`);
@@ -258,30 +318,42 @@ class MatdevBot {
         process.env.SESSION_DIR = path.join(this.sessionsDir, sessionConfig.id);
 
         console.log(`${colors.cyan}🔧 Environment variables configured${colors.reset}`);
-        console.log(`${colors.cyan}📂 Session directory: ${path.relative(process.cwd(), path.join(this.sessionsDir, sessionConfig.id))}${colors.reset}\n`);
+        console.log(`${colors.cyan}📂 Session directory: ${path.relative(process.cwd(), process.env.SESSION_DIR)}${colors.reset}\n`);
 
-        // Close readline interface before starting bot
-        this.rl.close();
+        // Check if src/index.js exists and start the bot
+        const mainFile = path.join(process.cwd(), 'src', 'index.js');
         
-        // Start the bot
-        await this.startBot();
-    }
-
-    async startBot() {
         try {
-            // Ensure required directories exist
-            await fs.ensureDir(config.SESSION_DIR);
-            await fs.ensureDir(config.DOWNLOAD_DIR);
-            await fs.ensureDir(config.PLUGIN_DIR);
-            await fs.ensureDir(config.EPLUGIN_DIR);
+            await fs.access(mainFile);
+            console.log(`${colors.green}✅ Found main bot application at src/index.js${colors.reset}`);
+            console.log(`${colors.cyan}🚀 Launching MATDEV bot...${colors.reset}`);
+            console.log(`${colors.yellow}📱 The bot will authenticate and connect to WhatsApp${colors.reset}\n`);
             
-            // Start the bot
-            const bot = new Client();
-            await bot.connect();
+            // Close readline interface before requiring the main app
+            this.rl.close();
+            
+            // Require and start the main bot application
+            require(mainFile);
             
         } catch (error) {
-            logger.error('Failed to start bot:', error);
-            process.exit(1);
+            console.log(`${colors.red}❌ Main bot application not found at src/index.js${colors.reset}`);
+            console.log(`${colors.blue}ℹ️  Session initialized successfully. Ready for bot implementation.${colors.reset}\n`);
+            
+            // Show session info
+            console.log(`${colors.bright}Session Information:${colors.reset}`);
+            console.log(`- Session ID: ${sessionConfig.id}`);
+            console.log(`- Phone Number: ${sessionConfig.phoneNumber || 'Not set'}`);
+            console.log(`- Auth Method: ${sessionConfig.authMethod === '1' ? 'QR Code' : '8-digit Pairing Code'}`);
+            console.log(`- Session Directory: ${path.relative(process.cwd(), path.join(this.sessionsDir, sessionConfig.id))}`);
+            console.log(`- Environment variables configured for bot initialization\n`);
+            
+            console.log(`${colors.cyan}${colors.bright}Next Steps:${colors.reset}`);
+            console.log(`1. Implement WhatsApp authentication in src/index.js`);
+            console.log(`2. Use the configured auth method: ${sessionConfig.authMethod === '1' ? 'QR Code' : '8-digit Pairing Code'}`);
+            console.log(`3. After successful auth, the actual JID will be auto-detected`);
+            console.log(`4. Bot will then operate using your WhatsApp account\n`);
+            
+            this.rl.close();
         }
     }
 
@@ -311,16 +383,68 @@ class MatdevBot {
             });
         });
     }
+
+    // Utility methods from setup.js
+    async fileExists(filePath) {
+        try {
+            await fs.access(filePath);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    async checkOutdatedPackages() {
+        try {
+            const result = await this.runCommand('npm', ['outdated', '--json'], { capture: true });
+            const outdated = JSON.parse(result.stdout || '{}');
+            return Object.keys(outdated);
+        } catch {
+            return [];
+        }
+    }
+
+    async runCommand(command, args, options = {}) {
+        return new Promise((resolve, reject) => {
+            const process = spawn(command, args, {
+                stdio: options.capture ? 'pipe' : 'inherit',
+                shell: true
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            if (options.capture) {
+                process.stdout.on('data', (data) => {
+                    stdout += data.toString();
+                });
+
+                process.stderr.on('data', (data) => {
+                    stderr += data.toString();
+                });
+            }
+
+            process.on('close', (code) => {
+                if (code === 0) {
+                    resolve({ stdout, stderr });
+                } else {
+                    reject(new Error(`Command failed with exit code ${code}`));
+                }
+            });
+
+            process.on('error', reject);
+        });
+    }
 }
 
 // Handle process termination gracefully
 process.on('SIGINT', () => {
-    console.log(`\n${colors.yellow}MATDEV bot shutting down...${colors.reset}`);
+    console.log(`\n${colors.yellow}MATDEV bot launcher interrupted${colors.reset}`);
     process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-    console.log(`\n${colors.yellow}MATDEV bot terminated${colors.reset}`);
+    console.log(`\n${colors.yellow}MATDEV bot launcher terminated${colors.reset}`);
     process.exit(0);
 });
 
@@ -337,9 +461,11 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Start the application
 if (require.main === module) {
-    const matdevBot = new MatdevBot();
-    matdevBot.start().catch((error) => {
+    const launcher = new MatdevBotLauncher();
+    launcher.launch().catch((error) => {
         console.error(`${colors.red}Failed to launch MATDEV bot:${colors.reset}`, error);
         process.exit(1);
     });
 }
+
+module.exports = MatdevBotLauncher;

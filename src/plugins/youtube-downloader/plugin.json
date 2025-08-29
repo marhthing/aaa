@@ -1,0 +1,50 @@
+{
+  "name": "youtube-downloader",
+  "displayName": "YouTube Video Downloader",
+  "description": "Downloads YouTube videos and sends them to chat",
+  "version": "1.0.0",
+  "author": "MATDEV",
+  "enabled": true,
+  "ownerOnly": false,
+  "priority": 15,
+  "category": "media",
+  "dependencies": [
+    "@distube/ytdl-core",
+    "fs-extra",
+    "path"
+  ],
+  "commands": [
+    {
+      "name": "ytv",
+      "description": "Download YouTube video and send to chat",
+      "usage": "ytv <youtube-url>",
+      "ownerOnly": false,
+      "examples": [
+        ".ytv https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        ".ytv https://youtu.be/dQw4w9WgXcQ",
+        ".ytv https://youtube.com/shorts/ZIRMxSQh764"
+      ]
+    }
+  ],
+  "features": [
+    "youtube-download",
+    "youtube-shorts-download",
+    "video-processing",
+    "file-management"
+  ],
+  "permissions": [
+    "storage:read",
+    "storage:write",
+    "network:external"
+  ],
+  "settings": {
+    "maxFileSize": "50MB",
+    "videoQuality": "highest",
+    "audioQuality": "highestaudio",
+    "autoDeleteAfter": "5 minutes"
+  },
+  "metadata": {
+    "created": "2025-08-18T10:15:00.000Z",
+    "tags": ["youtube", "download", "video", "media", "shorts"]
+  }
+}

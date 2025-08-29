@@ -1,0 +1,68 @@
+{
+  "name": "admin-tools",
+  "displayName": "Admin Tools",
+  "description": "Administrative utilities for system management and user control",
+  "version": "1.0.0",
+  "author": "WhatsApp Bot System",
+  "enabled": true,
+  "ownerOnly": true,
+  "priority": 10,
+  "dependencies": [],
+  "commands": [
+    {
+      "name": "systeminfo",
+      "description": "Display system information and resource usage",
+      "usage": "systeminfo",
+      "ownerOnly": true
+    },
+    {
+      "name": "plugins",
+      "description": "Manage bot plugins",
+      "usage": "plugins [list|enable|disable] [plugin]",
+      "ownerOnly": true
+    },
+    {
+      "name": "users",
+      "description": "Manage user permissions and access",
+      "usage": "users [list|info|block|unblock] [@user]",
+      "ownerOnly": true
+    },
+    {
+      "name": "permissions",
+      "description": "View and manage user permissions",
+      "usage": "permissions [@user]",
+      "ownerOnly": true
+    },
+    {
+      "name": "logs",
+      "description": "View system logs and activity",
+      "usage": "logs [type] [lines]",
+      "ownerOnly": true
+    },
+    {
+      "name": "cleanup",
+      "description": "Clean up temporary files and cache",
+      "usage": "cleanup [type]",
+      "ownerOnly": true
+    },
+    {
+      "name": "backup",
+      "description": "Create system backup",
+      "usage": "backup [type]",
+      "ownerOnly": true
+    }
+  ],
+  "features": [
+    "system-administration",
+    "user-management",
+    "plugin-management",
+    "system-monitoring"
+  ],
+  "permissions": [
+    "system:admin",
+    "users:manage",
+    "plugins:manage",
+    "logs:read",
+    "backup:create"
+  ]
+}
