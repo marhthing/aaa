@@ -20,7 +20,7 @@ bot(
       return await message.reply('❌ Invalid YouTube URL')
     }
 
-    await message.reply('⬇️ Downloading...')
+
     
     const tempFile = await downloadVideo(url, message.key.id)
     if (!tempFile) {
@@ -31,7 +31,7 @@ bot(
       // Send video
       await message.client.socket.sendMessage(message.key.remoteJid, {
         video: fs.readFileSync(tempFile),
-        caption: `📹 Downloaded from YouTube`
+
       })
       
       console.log('✅ Video sent successfully')
@@ -65,7 +65,7 @@ bot(
       return await message.reply('❌ Invalid YouTube URL')
     }
 
-    await message.reply('⬇️ Downloading...')
+
     
     const tempFile = await downloadVideo(url, message.key.id)
     if (!tempFile) {
@@ -76,7 +76,7 @@ bot(
       // Send video
       await message.client.socket.sendMessage(message.key.remoteJid, {
         video: fs.readFileSync(tempFile),
-        caption: `📹 Downloaded from YouTube`
+
       })
       
       console.log('✅ Video sent successfully')
