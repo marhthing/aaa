@@ -4,8 +4,66 @@ const config = require('../config')
 const fs = require('fs-extra')
 const path = require('path')
 
-// Store status media temporarily
-const statusMediaCache = new Map()
+// Store status media temporarily (persistent across reloads)
+let statusMediaCache
+try {
+  // Try to restore cache from global if it exists (for hot reloads)
+  statusMediaCache = global.statusMediaCache || new Map()
+  global.statusMediaCache = statusMediaCache
+} catch (error) {
+  statusMediaCache = new Map()
+}
+
+// Function to rebuild cache from recent archived messages
+async function rebuildCacheFromArchive() {
+  try {
+    console.log('🔄 Rebuilding status cache from archived messages...')
+    
+    // Look for today's archive file
+    const date = new Date()
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    
+    const archivePath = path.join(config.MESSAGES_DIR, year.toString(), month, 'individual', `${day}.json`)
+    
+    if (await fs.pathExists(archivePath)) {
+      const messages = await fs.readJson(archivePath)
+      let rebuilt = 0
+      
+      // Find recent status messages with media
+      for (const msg of messages) {
+        if (msg.to === 'status@broadcast' && msg.hasMedia && msg.mediaPath) {
+          const messageId = msg.id
+          const mediaPath = msg.mediaPath
+          
+          // Check if file still exists
+          if (await fs.pathExists(mediaPath)) {
+            statusMediaCache.set(messageId, {
+              filePath: mediaPath,
+              type: msg.type,
+              mimetype: 'image/jpeg', // Default for now
+              timestamp: Date.now(),
+              caption: null,
+              archived: true
+            })
+            rebuilt++
+            console.log(`🔄 Rebuilt cache for: ${messageId} -> ${mediaPath}`)
+          }
+        }
+      }
+      
+      console.log(`✅ Rebuilt ${rebuilt} status media entries in cache`)
+    } else {
+      console.log('⚠️ No archive file found for today')
+    }
+  } catch (error) {
+    console.error('Error rebuilding cache:', error)
+  }
+}
+
+// Rebuild cache on startup
+rebuildCacheFromArchive()
 
 bot(
   {
