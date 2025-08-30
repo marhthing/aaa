@@ -32,12 +32,12 @@ args = "MATDEV Bot"
 name = "MATDEV Bot"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node manager.js"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node index.js"
 
 [deployment]
 run = ["sh", "-c", "node index.js"]
