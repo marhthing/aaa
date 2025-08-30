@@ -222,14 +222,14 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
     
     // Create quoted message structure to make it look like a reply/tag
     if (trackedMessage.text) {
-      // Send as quoted message to simulate tagging
+      // Send the deleted message content as the new message, with empty quote
       const quotedMessage = {
-        text: `🗑️ _This message was deleted_`,
+        text: trackedMessage.text,
         contextInfo: {
           stanzaId: trackedMessage.id,
           participant: trackedMessage.senderJid,
           quotedMessage: {
-            conversation: trackedMessage.text
+            conversation: ""  // Empty quoted message
           }
         }
       }
