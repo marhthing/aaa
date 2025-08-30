@@ -98,13 +98,14 @@ async function convertToSticker(buffer, mediaType, messageId) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     
     if (mediaType === 'image') {
-      // Convert image to WebP sticker format
+      // Convert image to WebP sticker format without black background
       const stickerBuffer = await sharp(buffer)
         .resize(512, 512, {
-          fit: 'contain',
+          fit: 'inside',
+          withoutEnlargement: true,
           background: { r: 0, g: 0, b: 0, alpha: 0 }
         })
-        .webp()
+        .webp({ quality: 90 })
         .toBuffer()
       
       // Save to data folder temporarily
@@ -134,7 +135,7 @@ async function convertToSticker(buffer, mediaType, messageId) {
         
         ffmpeg(tempInput)
           .outputOptions([
-            '-vf', 'scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:-1:-1:color=black@0',
+            '-vf', 'scale=512:512:force_original_aspect_ratio=decrease:eval=frame,format=rgba,pad=512:512:-1:-1:color=0x00000000',
             '-loop', '0',
             '-preset', 'default',
             '-an',
