@@ -14,7 +14,7 @@ bot(
     }
 
     const url = match.trim()
-    
+
     // Validate Instagram URL
     if (!url.includes('instagram.com')) {
       return await message.reply('❌ Please provide a valid Instagram URL')
@@ -24,29 +24,25 @@ bot(
 
     try {
       await message.reply('🔄 Downloading from Instagram...')
-      
-      // Method 1: Using InstaSave (Free API)
+
+      // Method 1: Using InstaLooter API (Free)
       try {
-        const response = await axios.get(`https://api.instasave.website/media?url=${encodeURIComponent(url)}`, {
+        const response = await axios.post('https://instalooter.com/api/post', {
+          url: url
+        }, {
           headers: {
+            'Content-Type': 'application/json',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
           }
         })
-        
-        if (response.data && response.data.status === 'success' && response.data.media && response.data.media.length > 0) {
+
+        if (response.data && response.data.success && response.data.media) {
           const media = response.data.media[0]
           const mediaUrl = media.url
-          const mediaType = media.type || 'image'
-          const username = response.data.user?.username || 'Unknown'
-
-          const caption = `📸 *Instagram ${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)}*\n\n` +
-                         `👤 **User:** ${username}\n` +
-                         `📱 **Type:** ${mediaType}\n` +
-                         `🔗 **Source:** Instagram`
+          const caption = `📷 *Instagram Post*\n\n🔗 **Source:** Instagram`
 
           await message.react('✅')
-
-          if (mediaType === 'video') {
+          if (media.type === 'video') {
             return await message.send('', {
               video: { url: mediaUrl },
               caption: caption
@@ -59,88 +55,119 @@ bot(
           }
         }
       } catch (error1) {
-        console.error('InstaSave method failed:', error1.message)
+        console.error('InstaLooter method failed:', error1.message)
       }
 
-      // Method 2: Using DownloadGram (Free alternative)
+      // Method 2: Using SaveInsta API (Free alternative)
       try {
-        const response2 = await axios.post('https://downloadgram.org/media.php', 
-          `url=${encodeURIComponent(url)}`,
-          {
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-              'Referer': 'https://downloadgram.org/'
-            }
+        const response2 = await axios.post('https://saveinsta.app/core/ajax.php', {
+          url: url,
+          host: 'instagram'
+        }, {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Referer': 'https://saveinsta.app/'
           }
-        )
+        })
 
         if (response2.data && typeof response2.data === 'string') {
-          // Parse HTML response to extract download links
-          const videoMatch = response2.data.match(/<a[^>]*href="([^"]*)"[^>]*>Download Video<\/a>/)
-          const imageMatch = response2.data.match(/<a[^>]*href="([^"]*)"[^>]*>Download Image<\/a>/)
-
-          if (videoMatch || imageMatch) {
-            const downloadUrl = videoMatch ? videoMatch[1] : imageMatch[1]
-            const mediaType = videoMatch ? 'video' : 'image'
-
-            const caption = `📸 *Instagram ${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)}*\n\n` +
-                           `📱 **Type:** ${mediaType}\n` +
-                           `🔗 **Source:** Instagram`
+          const urlMatch = response2.data.match(/"url":"([^"]*)"/)
+          if (urlMatch) {
+            const mediaUrl = urlMatch[1].replace(/\\u002F/g, '/')
+            const caption = `📷 *Instagram Post*\n\n🔗 **Source:** Instagram`
 
             await message.react('✅')
-
-            if (mediaType === 'video') {
+            // Try to determine if it's video or image from URL
+            if (mediaUrl.includes('.mp4') || mediaUrl.includes('video')) {
               return await message.send('', {
-                video: { url: downloadUrl },
+                video: { url: mediaUrl },
                 caption: caption
               })
             } else {
               return await message.send('', {
-                image: { url: downloadUrl },
+                image: { url: mediaUrl },
                 caption: caption
               })
             }
           }
         }
       } catch (error2) {
-        console.error('DownloadGram method failed:', error2.message)
+        console.error('SaveInsta method failed:', error2.message)
       }
 
-      // Method 3: Using Insta-Downloader (Another free option)
+      // Method 3: Using InstaDownloader API (Free alternative)
       try {
-        const response3 = await axios.get(`https://api.insta-downloader.com/download?url=${encodeURIComponent(url)}`, {
+        const response3 = await axios.get(`https://instadownloader.co/system/action.php`, {
+          params: {
+            url: url,
+            ajax: 1,
+            download: 1
+          },
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Referer': 'https://instadownloader.co/'
           }
         })
-        
-        if (response3.data && response3.data.download_url) {
-          const downloadUrl = response3.data.download_url
-          const mediaType = response3.data.type || 'image'
-          const username = response3.data.username || 'Unknown'
 
-          const caption = `📸 *Instagram ${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)}*\n\n` +
-                         `👤 **User:** ${username}\n` +
-                         `📱 **Type:** ${mediaType}\n` +
-                         `🔗 **Source:** Instagram`
+        if (response3.data && response3.data.success && response3.data.data) {
+          const mediaData = response3.data.data[0]
+          const mediaUrl = mediaData.url
+          const caption = `📷 *Instagram Post*\n\n🔗 **Source:** Instagram`
 
           await message.react('✅')
-
-          if (mediaType === 'video') {
+          if (mediaData.type === 'video') {
             return await message.send('', {
-              video: { url: downloadUrl },
+              video: { url: mediaUrl },
               caption: caption
             })
           } else {
             return await message.send('', {
-              image: { url: downloadUrl },
+              image: { url: mediaUrl },
               caption: caption
             })
           }
         }
       } catch (error3) {
-        console.error('Insta-Downloader method failed:', error3.message)
+        console.error('InstaDownloader method failed:', error3.message)
+      }
+
+      // Method 4: Using SnapInsta API (Free alternative)
+      try {
+        const response4 = await axios.post('https://snapinsta.app/action2.php', 
+          `url=${encodeURIComponent(url)}&action=post`,
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+              'Referer': 'https://snapinsta.app/'
+            }
+          }
+        )
+
+        if (response4.data && typeof response4.data === 'string') {
+          // Parse HTML response to extract download link
+          const urlMatch = response4.data.match(/href="([^"]*(?:jpg|jpeg|png|mp4)[^"]*)"/)
+          if (urlMatch) {
+            const mediaUrl = urlMatch[1]
+            const caption = `📷 *Instagram Post*\n\n🔗 **Source:** Instagram`
+
+            await message.react('✅')
+            if (mediaUrl.includes('.mp4')) {
+              return await message.send('', {
+                video: { url: mediaUrl },
+                caption: caption
+              })
+            } else {
+              return await message.send('', {
+                image: { url: mediaUrl },
+                caption: caption
+              })
+            }
+          }
+        }
+      } catch (error4) {
+        console.error('SnapInsta method failed:', error4.message)
       }
 
       await message.react('❌')

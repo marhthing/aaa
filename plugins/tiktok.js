@@ -1,3 +1,4 @@
+
 const { bot } = require('../lib/client')
 const axios = require('axios')
 
@@ -24,18 +25,56 @@ bot(
     try {
       await message.reply('🔄 Downloading from TikTok...')
 
-      // Method 1: Using TikWM (Free and reliable)
+      // Method 1: Using TikTok Scraper API (Free)
       try {
-        const response = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`, {
+        const response = await axios.post('https://lovetik.com/api/ajax/search', {
+          query: url
+        }, {
           headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Referer': 'https://lovetik.com/'
+          }
+        })
+
+        if (response.data && response.data.links && response.data.links.length > 0) {
+          const videoData = response.data.links[0]
+          const videoUrl = videoData.a || videoData.url
+          const title = response.data.desc || 'TikTok Video'
+          const author = response.data.author || 'Unknown'
+
+          if (videoUrl) {
+            const caption = `🎵 *TikTok Video*\n\n` +
+                           `👤 **Author:** ${author}\n` +
+                           `📝 **Title:** ${title}\n` +
+                           `🔗 **Source:** TikTok`
+
+            await message.react('✅')
+            return await message.send('', {
+              video: { url: videoUrl },
+              caption: caption
+            })
+          }
+        }
+      } catch (error1) {
+        console.error('Lovetik method failed:', error1.message)
+      }
+
+      // Method 2: Using TikMate API (Free alternative)
+      try {
+        const response2 = await axios.post('https://tikmate.online/download/link', {
+          url: url
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
           }
         })
 
-        if (response.data && response.data.data && response.data.data.play) {
-          const videoUrl = response.data.data.play
-          const title = response.data.data.title || 'TikTok Video'
-          const author = response.data.data.author?.nickname || 'Unknown'
+        if (response2.data && response2.data.success && response2.data.video_url) {
+          const videoUrl = response2.data.video_url
+          const title = response2.data.title || 'TikTok Video'
+          const author = response2.data.author || 'Unknown'
 
           const caption = `🎵 *TikTok Video*\n\n` +
                          `👤 **Author:** ${author}\n` +
@@ -48,71 +87,71 @@ bot(
             caption: caption
           })
         }
-      } catch (error1) {
-        console.error('TikWM method failed:', error1.message)
-      }
-
-      // Method 2: Using SSSTik (Free alternative)
-      try {
-        const response2 = await axios.post('https://ssstik.io/abc?url=dl', 
-          `id=${encodeURIComponent(url)}&locale=en&tt=1`,
-          {
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-              'Referer': 'https://ssstik.io/'
-            }
-          }
-        )
-
-        if (response2.data && typeof response2.data === 'string') {
-          // Parse the response to extract video URL
-          const videoMatch = response2.data.match(/"url":"([^"]*\.mp4[^"]*)"/)
-          if (videoMatch) {
-            const videoUrl = videoMatch[1].replace(/\\u002F/g, '/')
-
-            const caption = `🎵 *TikTok Video*\n\n🔗 **Source:** TikTok`
-
-            await message.react('✅')
-            return await message.send('', {
-              video: { url: videoUrl },
-              caption: caption
-            })
-          }
-        }
       } catch (error2) {
-        console.error('SSSTik method failed:', error2.message)
+        console.error('TikMate method failed:', error2.message)
       }
 
-      // Method 3: Using SnapTik (Free alternative)
+      // Method 3: Using SaveTT API (Free alternative)
       try {
-        const response3 = await axios.post('https://snaptik.app/abc2.php', 
-          `url=${encodeURIComponent(url)}`,
-          {
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-              'Referer': 'https://snaptik.app/'
-            }
+        const response3 = await axios.get(`https://savett.cc/api/ajaxSearch`, {
+          params: {
+            q: url,
+            lang: 'en'
+          },
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
           }
-        )
+        })
 
-        if (response3.data && typeof response3.data === 'string') {
-          const videoMatch = response3.data.match(/"url":"([^"]*\.mp4[^"]*)"/)
-          if (videoMatch) {
-            const videoUrl = videoMatch[1].replace(/\\u002F/g, '/')
-
+        if (response3.data && response3.data.status === 'ok' && response3.data.links) {
+          const videoLink = response3.data.links.find(link => link.s && link.s.includes('mp4'))
+          if (videoLink && videoLink.a) {
             const caption = `🎵 *TikTok Video*\n\n🔗 **Source:** TikTok`
 
             await message.react('✅')
             return await message.send('', {
-              video: { url: videoUrl },
+              video: { url: videoLink.a },
               caption: caption
             })
           }
         }
       } catch (error3) {
-        console.error('SnapTik method failed:', error3.message)
+        console.error('SaveTT method failed:', error3.message)
+      }
+
+      // Method 4: Using TikWM (Updated approach)
+      try {
+        const response4 = await axios.get(`https://www.tikwm.com/api/`, {
+          params: {
+            url: url,
+            hd: 1
+          },
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          }
+        })
+
+        if (response4.data && response4.data.code === 0 && response4.data.data) {
+          const data = response4.data.data
+          const videoUrl = data.hdplay || data.play || data.wmplay
+          const title = data.title || 'TikTok Video'
+          const author = data.author?.nickname || 'Unknown'
+
+          if (videoUrl) {
+            const caption = `🎵 *TikTok Video*\n\n` +
+                           `👤 **Author:** ${author}\n` +
+                           `📝 **Title:** ${title}\n` +
+                           `🔗 **Source:** TikTok`
+
+            await message.react('✅')
+            return await message.send('', {
+              video: { url: videoUrl },
+              caption: caption
+            })
+          }
+        }
+      } catch (error4) {
+        console.error('TikWM method failed:', error4.message)
       }
 
       await message.react('❌')
