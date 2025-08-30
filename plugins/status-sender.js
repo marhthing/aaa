@@ -143,7 +143,7 @@ bot(
       
       if (!mediaFile) {
         console.log('❌ No media file found for this message ID')
-        return await message.reply('❌ No media found for this status. Media may have been deleted.')
+        return
       }
 
       // Send the media to bot owner's personal chat
@@ -153,7 +153,6 @@ bot(
       const mediaMessage = await createMediaMessageFromFile(mediaFile)
       await message.client.socket.sendMessage(botOwnerJid, mediaMessage)
       
-      await message.reply('✅ Status media saved to bot owner personal chat!')
       console.log(`✅ Status media saved for bot owner: ${botOwnerJid}`)
       
     } catch (error) {
@@ -192,7 +191,7 @@ bot(
       // Find media file directly from storage using message ID
       const mediaFile = await findMediaFileByMessageId(quotedMessageId)
       if (!mediaFile) {
-        return await message.reply('❌ No media found for this status. Media may have been deleted.')
+        return
       }
 
       // Send the media to specified JID
@@ -201,7 +200,6 @@ bot(
       const mediaMessage = await createMediaMessageFromFile(mediaFile)
       await message.client.socket.sendMessage(targetJid, mediaMessage)
       
-      await message.reply(`✅ Status media sent to ${targetJid}!`)
       console.log(`✅ Status media sent to specified JID: ${targetJid}`)
       
     } catch (error) {
@@ -405,29 +403,35 @@ function getMediaExtension(messageContent) {
 
 
 // Hook into the client's message handling to intercept status updates and replies
-const originalHandleMessage = require('../lib/client').Client.prototype.handleMessage
+// Use a guard to prevent multiple hook installations during hot reloads
+if (!global.statusSenderHookInstalled) {
+  const originalHandleMessage = require('../lib/client').Client.prototype.handleMessage
 
-require('../lib/client').Client.prototype.handleMessage = async function(message) {
-  try {
-    // Handle status updates (when owner posts to status)
-    if (message.key.remoteJid === 'status@broadcast') {
-      await handleStatusUpdate(this, message)
+  require('../lib/client').Client.prototype.handleMessage = async function(message) {
+    try {
+      // Handle status updates (when owner posts to status)
+      if (message.key.remoteJid === 'status@broadcast') {
+        await handleStatusUpdate(this, message)
+      }
+      
+      // Handle potential status replies
+      const text = require('../lib/utils').getMessageText(message)
+      if (text && message.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
+        await handleStatusReply(this, message)
+      }
+      
+      // Call original handler
+      return await originalHandleMessage.call(this, message)
+      
+    } catch (error) {
+      console.error('Status sender error:', error)
+      // Call original handler even if status sender fails
+      return await originalHandleMessage.call(this, message)
     }
-    
-    // Handle potential status replies
-    const text = require('../lib/utils').getMessageText(message)
-    if (text && message.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
-      await handleStatusReply(this, message)
-    }
-    
-    // Call original handler
-    return await originalHandleMessage.call(this, message)
-    
-  } catch (error) {
-    console.error('Status sender error:', error)
-    // Call original handler even if status sender fails
-    return await originalHandleMessage.call(this, message)
   }
+  
+  global.statusSenderHookInstalled = true
+  console.log('📱 Status sender message hook installed')
 }
 
 console.log('📱 Status auto-sender plugin loaded')
