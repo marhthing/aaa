@@ -79,81 +79,86 @@ async function downloadFacebookVideo(url, messageId) {
 }
 
 async function downloadWithSnapSave(url, messageId) {
-  const response = await axios.post('https://snapsave.app/action2.php', 
-    `url=${encodeURIComponent(url)}&lang=en`,
+  // Updated 2025 SnapSave API endpoint
+  const response = await axios.post('https://snapsave.app/action.php', 
+    { 
+      url: url,
+      lang: 'en'
+    },
     {
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://snapsave.app/'
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://snapsave.app/',
+        'Accept': 'application/json'
       },
       timeout: 30000
     }
   )
 
-  // Look for HD and SD video links
-  const patterns = [
-    /href="([^"]+)"[^>]*>.*?Download.*?HD/i,
-    /href="([^"]+)"[^>]*>.*?Download.*?SD/i,
-    /data-url="([^"]+)"/
-  ]
-  
-  for (const pattern of patterns) {
-    const match = response.data.match(pattern)
-    if (match?.[1] && match[1].includes('.mp4')) {
-      return await downloadFromDirectUrl(match[1], messageId, 'fb_snap_')
+  // Updated patterns for 2025 response format
+  if (response.data && response.data.success) {
+    const links = response.data.data?.links || []
+    for (const link of links) {
+      if (link.url && link.quality && link.url.includes('.mp4')) {
+        return await downloadFromDirectUrl(link.url, messageId, 'fb_snap_')
+      }
     }
   }
+  
   throw new Error('No video URL from SnapSave')
 }
 
 async function downloadWithFDown(url, messageId) {
-  const response = await axios.post('https://fdown.net/download', 
-    `URLz=${encodeURIComponent(url)}`,
+  // Updated 2025 FDown API endpoint
+  const response = await axios.post('https://fdown.net/api/download', 
+    {
+      url: url
+    },
     {
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://fdown.net/'
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://fdown.net/',
+        'Accept': 'application/json'
       },
       timeout: 30000
     }
   )
 
-  // Look for download links in response
-  const patterns = [
-    /href="([^"]+)"[^>]*>.*?Download.*?HD/i,
-    /href="([^"]+)"[^>]*>.*?Download.*?Normal/i,
-    /data-url="([^"]+)"/
-  ]
-  
-  for (const pattern of patterns) {
-    const match = response.data.match(pattern)
-    if (match?.[1] && match[1].includes('video.fbcdn.net')) {
-      return await downloadFromDirectUrl(match[1], messageId, 'fb_fdown_')
+  // Updated for 2025 JSON response format
+  if (response.data && response.data.status === 'success') {
+    const videoUrl = response.data.data?.hd || response.data.data?.sd
+    if (videoUrl && videoUrl.includes('fbcdn.net')) {
+      return await downloadFromDirectUrl(videoUrl, messageId, 'fb_fdown_')
     }
   }
+  
   throw new Error('No video URL from FDown')
 }
 
 async function downloadWithFDownloader(url, messageId) {
-  const response = await axios.post('https://fdownloader.net/api/ajaxSearch', {
-    q: url,
-    vt: 'facebook'
+  // Updated 2025 FDownloader API
+  const response = await axios.post('https://fdownloader.net/api/facebook', {
+    url: url
   }, {
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
+      'Content-Type': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Accept': 'application/json'
     },
     timeout: 30000
   })
 
-  if (response.data?.links) {
-    const hdLink = response.data.links.find(link => link.quality === 'hd')
-    const videoUrl = hdLink ? hdLink.link : response.data.links[0]?.link
-    if (videoUrl) {
+  if (response.data && response.data.success) {
+    const videoData = response.data.data
+    const videoUrl = videoData?.hd_url || videoData?.sd_url || videoData?.video_url
+    
+    if (videoUrl && (videoUrl.includes('fbcdn.net') || videoUrl.includes('facebook.com'))) {
       return await downloadFromDirectUrl(videoUrl, messageId, 'fb_fdl_')
     }
   }
+  
   throw new Error('No video URL from FDownloader')
 }
 
