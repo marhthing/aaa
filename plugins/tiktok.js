@@ -52,7 +52,6 @@ bot(
 
       // Method 1: TikWM API (Most reliable)
       try {
-        console.log('🔄 Trying TikWM API...')
         const response = await axios.get(`${APIs[0].url}?url=${encodeURIComponent(url)}&hd=1`, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -61,8 +60,6 @@ bot(
           },
           timeout: 20000
         })
-
-        console.log('TikWM Response:', JSON.stringify(response.data, null, 2))
 
         if (response.data && response.data.code === 0 && response.data.data) {
           const data = response.data.data
@@ -76,23 +73,20 @@ bot(
                            `📝 **Title:** ${title.substring(0, 100)}${title.length > 100 ? '...' : ''}\n` +
                            `🔗 **Source:** TikTok`
 
-            await message.send('', {
+            await message.reply('', {
               video: { url: videoUrl },
               caption: caption
             })
             success = true
-            console.log('✅ TikWM API successful')
           }
         }
       } catch (error1) {
         lastError = `TikWM API failed: ${error1.message}`
-        console.error('❌ TikWM API failed:', error1.message)
       }
 
       // Method 2: SSSTik API
       if (!success) {
         try {
-          console.log('🔄 Trying SSSTik API...')
           const response = await axios.post(APIs[1].url, `id=${encodeURIComponent(url)}&locale=en&tt=bWJuZWdq`, {
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -120,23 +114,20 @@ bot(
                            `📝 **Title:** ${title.substring(0, 100)}${title.length > 100 ? '...' : ''}\n` +
                            `🔗 **Source:** TikTok`
 
-            await message.send('', {
+            await message.reply('', {
               video: { url: videoUrl },
               caption: caption
             })
             success = true
-            console.log('✅ SSSTik API successful')
           }
         } catch (error2) {
           lastError = `SSSTik API failed: ${error2.message}`
-          console.error('❌ SSSTik API failed:', error2.message)
         }
       }
 
       // Method 3: MusicalDown API
       if (!success) {
         try {
-          console.log('🔄 Trying MusicalDown API...')
           const response = await axios.post(APIs[2].url, `url=${encodeURIComponent(url)}`, {
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded',
@@ -158,24 +149,20 @@ bot(
                            `📝 **Title:** TikTok Video\n` +
                            `🔗 **Source:** TikTok`
 
-            await message.send('', {
+            await message.reply('', {
               video: { url: videoUrl },
               caption: caption
             })
             success = true
-            console.log('✅ MusicalDown API successful')
           }
         } catch (error3) {
           lastError = `MusicalDown API failed: ${error3.message}`
-          console.error('❌ MusicalDown API failed:', error3.message)
         }
       }
 
       // Method 4: Direct extraction attempt
       if (!success) {
         try {
-          console.log('🔄 Trying direct extraction...')
-          
           // Convert short URL to full URL if needed
           let fullUrl = url
           if (url.includes('vt.tiktok.com') || url.includes('vm.tiktok.com')) {
@@ -211,28 +198,24 @@ bot(
                                `📝 **Title:** ${data.title || 'TikTok Video'}\n` +
                                `🔗 **Source:** TikTok`
 
-                await message.send('', {
+                await message.reply('', {
                   video: { url: videoUrl },
                   caption: caption
                 })
                 success = true
-                console.log('✅ Direct extraction successful')
               }
             }
           }
         } catch (error4) {
           lastError = `Direct extraction failed: ${error4.message}`
-          console.error('❌ Direct extraction failed:', error4.message)
         }
       }
 
       if (!success) {
-        console.error('❌ All TikTok download methods failed')
         return await message.reply(`❌ Failed to download TikTok video. All services are currently unavailable.\n\n**Last error:** ${lastError}\n\n**Possible reasons:**\n• Video is private or restricted\n• TikTok has updated their API\n• Network connectivity issues\n• Video URL is invalid\n\nPlease try again later or with a different video.`)
       }
 
     } catch (error) {
-      console.error('❌ TikTok download error:', error)
       return await message.reply(`❌ Failed to download TikTok video: ${error.message}\n\nPlease try again later.`)
     }
   }
