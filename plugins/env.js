@@ -54,7 +54,13 @@ bot(
   async (message, match) => {
     // STRICT OWNER-ONLY CHECK - Cannot be bypassed by .allow
     const senderJid = message.key.remoteJid.endsWith('@g.us') ? message.key.participant : message.key.remoteJid
-    if (senderJid !== message.client.ownerJid) {
+    const ownerJid = message.client.ownerJid
+    
+    // Extract base phone number from both JIDs for comparison (handle :device_id format)
+    const senderPhone = senderJid.split('@')[0].split(':')[0]
+    const ownerPhone = ownerJid.split('@')[0].split(':')[0]
+    
+    if (senderPhone !== ownerPhone) {
       return await message.reply('🔒 Environment management is restricted to bot owner only')
     }
     
