@@ -86,3 +86,101 @@ bot(
     return await message.reply(statusMessage)
   }
 )
+
+bot(
+  {
+    pattern: 'update ?(.*)',
+    desc: 'Check for updates or update the bot',
+    type: 'system',
+  },
+  async (message, match) => {
+    // Only owner can update
+    if (!message.key.fromMe && message.sender !== message.client.ownerJid) {
+      return await message.reply('❌ Only owner can update the bot')
+    }
+
+    const { spawn, spawnSync } = require('child_process')
+    const fs = require('fs')
+    const path = require('path')
+
+    const args = match.trim().toLowerCase()
+
+    if (args === 'now') {
+      try {
+        await message.reply('🔄 *Updating Bot...*\n\nRecloning from repository and restarting...')
+        
+        // Give time for the message to be sent
+        setTimeout(() => {
+          console.log('🔄 Bot update requested by owner - triggering reclone')
+          // Create a flag file to signal the manager to reclone
+          fs.writeFileSync(path.join(__dirname, '../.update_flag'), 'reclone')
+          process.exit(1) // Exit code 1 will trigger restart in manager
+        }, 2000)
+      } catch (error) {
+        console.error('Failed to send update acknowledgment:', error)
+      }
+      return
+    }
+
+    // Check for updates
+    try {
+      await message.reply('🔍 *Checking for updates...*')
+
+      // Check if git is available and we're in a git repository
+      const gitCheckResult = spawnSync('git', ['status', '--porcelain'], {
+        stdio: 'pipe'
+      })
+
+      if (gitCheckResult.error) {
+        return await message.reply('❌ *Git not available*\n\nCannot check for updates. Use `.update now` to force reclone from repository.')
+      }
+
+      // Check remote updates
+      const fetchResult = spawnSync('git', ['fetch', 'origin'], {
+        stdio: 'pipe'
+      })
+
+      if (fetchResult.status !== 0) {
+        return await message.reply('❌ *Cannot fetch from remote*\n\nUse `.update now` to force reclone from repository.')
+      }
+
+      // Check how many commits behind
+      const behindResult = spawnSync('git', ['rev-list', '--count', 'HEAD..origin/main'], {
+        stdio: 'pipe',
+        encoding: 'utf8'
+      })
+
+      if (behindResult.status !== 0) {
+        // Try with master branch
+        const behindMasterResult = spawnSync('git', ['rev-list', '--count', 'HEAD..origin/master'], {
+          stdio: 'pipe',
+          encoding: 'utf8'
+        })
+        
+        if (behindMasterResult.status === 0) {
+          const commitsBehind = parseInt(behindMasterResult.stdout.trim()) || 0
+          
+          if (commitsBehind === 0) {
+            return await message.reply('✅ *Bot is up to date!*\n\nNo updates available.')
+          } else {
+            return await message.reply(`🔄 *${commitsBehind} update(s) available*\n\nUse \`.update now\` to update the bot.`)
+          }
+        }
+        
+        return await message.reply('⚠️ *Cannot determine update status*\n\nUse `.update now` to force reclone from repository.')
+      }
+
+      const commitsBehind = parseInt(behindResult.stdout.trim()) || 0
+      
+      if (commitsBehind === 0) {
+        return await message.reply('✅ *Bot is up to date!*\n\nNo updates available.')
+      } else {
+        return await message.reply(`🔄 *${commitsBehind} update(s) available*\n\nUse \`.update now\` to update the bot.`)
+      }
+
+    } catch (error) {
+      console.error('Update check error:', error)
+      return await message.reply('❌ *Error checking for updates*\n\nUse `.update now` to force reclone from repository.')
+    }
+  }
+)

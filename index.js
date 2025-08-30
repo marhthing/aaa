@@ -228,11 +228,37 @@ function setupBot() {
 function startBot() {
     console.log('🚀 Starting MATDEV Bot...')
 
+    // Check for update flag
+    const updateFlagPath = path.resolve('.update_flag')
+    if (existsSync(updateFlagPath)) {
+        console.log('🔄 Update flag detected - forcing reclone...')
+        try {
+            fs.unlinkSync(updateFlagPath) // Remove the flag file
+            console.log('🗑️ Update flag removed')
+        } catch (err) {
+            console.error('⚠️ Could not remove update flag:', err.message)
+        }
+        
+        // Force reclone by calling cloneRepository directly
+        try {
+            const entryPoint = cloneRepository()
+            console.log(`🎯 Starting bot with: ${entryPoint}`)
+            startBotProcess(entryPoint)
+            return
+        } catch (error) {
+            console.error('❌ Failed to reclone repository:', error.message)
+            process.exit(1)
+        }
+    }
+
     // Determine the entry point
     let entryPoint = setupBot()
 
     console.log(`🎯 Starting bot with: ${entryPoint}`)
+    startBotProcess(entryPoint)
+}
 
+function startBotProcess(entryPoint) {
     const child = spawn('node', [entryPoint], {
         stdio: 'inherit',
         cwd: __dirname
