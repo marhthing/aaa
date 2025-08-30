@@ -119,7 +119,7 @@ async function initializeAntiDelete() {
 // Hook into message handling
 bot(
   {
-    pattern: 'antidelete ?(.*)',
+    pattern: 'delete ?(.*)',
     desc: 'Configure anti-delete settings',
     type: 'system',
   },
@@ -129,76 +129,46 @@ bot(
       return await message.reply('❌ Only owner can configure anti-delete settings')
     }
     
-    const args = match.trim().split(' ')
-    const action = args[0]?.toLowerCase()
+    const param = match.trim().toLowerCase()
     
-    if (!action) {
-      const status = antiDeleteConfig.enabled ? '🟢 Enabled' : '🔴 Disabled'
+    if (!param) {
+      // Show current status
+      const status = antiDeleteConfig.enabled ? '🟢 ON' : '🔴 OFF'
       const target = antiDeleteConfig.customJid 
-        ? `Custom JID: ${antiDeleteConfig.customJid}` 
-        : antiDeleteConfig.sendToPersonal 
-          ? 'Personal Chat' 
-          : 'Disabled'
+        ? antiDeleteConfig.customJid
+        : 'User Personal Chat'
       
       return await message.reply(
         `🛡️ *Anti-Delete Status*\n\n` +
         `Status: ${status}\n` +
-        `Target: ${target}\n` +
-        `Track Duration: ${antiDeleteConfig.trackDuration / 1000 / 60 / 60}h\n` +
-        `Ignore Owner: ${antiDeleteConfig.ignoreOwner ? 'Yes' : 'No'}\n\n` +
+        `Target: ${target}\n\n` +
         `*Commands:*\n` +
-        `• \`.antidelete enable\` - Enable anti-delete\n` +
-        `• \`.antidelete disable\` - Disable anti-delete\n` +
-        `• \`.antidelete setjid <jid>\` - Set custom JID\n` +
-        `• \`.antidelete personal\` - Send to personal chat\n` +
-        `• \`.antidelete ignore owner on/off\` - Toggle owner ignore`
+        `• \`.delete on\` - Enable anti-delete\n` +
+        `• \`.delete off\` - Disable anti-delete\n` +
+        `• \`.delete <jid>\` - Set custom JID`
       )
     }
     
-    switch (action) {
-      case 'enable':
-        antiDeleteConfig.enabled = true
-        await saveAntiDeleteConfig()
-        return await message.reply('✅ Anti-delete enabled')
-        
-      case 'disable':
-        antiDeleteConfig.enabled = false
-        await saveAntiDeleteConfig()
-        return await message.reply('❌ Anti-delete disabled')
-        
-      case 'setjid':
-        const jid = args[1]
-        if (!jid) {
-          return await message.reply('❌ Usage: .antidelete setjid <jid>')
-        }
-        antiDeleteConfig.customJid = jid
-        antiDeleteConfig.sendToPersonal = false
-        await saveAntiDeleteConfig()
-        return await message.reply(`✅ Anti-delete will send to: ${jid}`)
-        
-      case 'personal':
-        antiDeleteConfig.sendToPersonal = true
-        antiDeleteConfig.customJid = null
-        await saveAntiDeleteConfig()
-        return await message.reply('✅ Anti-delete will send to personal chat')
-        
-      case 'ignore':
-        if (args[1] === 'owner') {
-          const setting = args[2]?.toLowerCase()
-          if (setting === 'on') {
-            antiDeleteConfig.ignoreOwner = true
-            await saveAntiDeleteConfig()
-            return await message.reply('✅ Will ignore owner deleted messages')
-          } else if (setting === 'off') {
-            antiDeleteConfig.ignoreOwner = false
-            await saveAntiDeleteConfig()
-            return await message.reply('✅ Will track owner deleted messages')
-          }
-        }
-        return await message.reply('❌ Usage: .antidelete ignore owner on/off')
-        
-      default:
-        return await message.reply('❌ Invalid option. Use `.antidelete` to see available commands')
+    if (param === 'on') {
+      antiDeleteConfig.enabled = true
+      await saveAntiDeleteConfig()
+      return await message.reply('✅ Anti-delete enabled')
+    }
+    
+    if (param === 'off') {
+      antiDeleteConfig.enabled = false
+      await saveAntiDeleteConfig()
+      return await message.reply('❌ Anti-delete disabled')
+    }
+    
+    // If it's not 'on' or 'off', treat it as JID
+    if (param.includes('@')) {
+      antiDeleteConfig.customJid = param
+      antiDeleteConfig.sendToPersonal = false
+      await saveAntiDeleteConfig()
+      return await message.reply(`✅ Anti-delete will send to: ${param}`)
+    } else {
+      return await message.reply('❌ Invalid JID format or command\n\nUse: `.delete on/off` or `.delete <jid>`')
     }
   }
 )
