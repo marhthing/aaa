@@ -53,7 +53,7 @@ bot(
       // Get sticker pack name - only use custom name if set, otherwise just MATDEV
       const customName = process.env.STICKER_NAME || process.env.STICKER_PACKNAME
       const packName = customName || 'MATDEV'
-      const authorName = customName ? '' : 'MATDEV'  // No author if custom name set
+      const authorName = ''  // Always empty so only pack name shows
       
       // Create sticker with proper metadata using wa-sticker-formatter
       const sticker = new Sticker(buffer, {
