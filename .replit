@@ -8,7 +8,7 @@ channel = "stable-25_05"
 packages = ["glib", "gtk3", "nss", "libdrm", "mesa", "chromium", "unzipNLS", "ffmpeg"]
 
 [workflows]
-runButton = "MATDEV Bot with Manager"
+runButton = "Project"
 
 [[workflows.workflow]]
 name = "MATDEV Bot with Manager"
