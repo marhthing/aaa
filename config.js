@@ -93,8 +93,8 @@ module.exports = {
     
     // Development & Debug
     NODE_ENV: process.env.NODE_ENV || 'development',
-    DEBUG_MODE: toBool(process.env.DEBUG_MODE) ?? false,
-    VERBOSE_LOGGING: toBool(process.env.VERBOSE_LOGGING) ?? false,
+    DEBUG_MODE: toBool(process.env.DEBUG_MODE) ?? true,
+    VERBOSE_LOGGING: toBool(process.env.VERBOSE_LOGGING) ?? true,
     
     // External Services (preserved for backward compatibility)
     BRAINSHOP: process.env.BRAINSHOP || '159501,6pq8dPiYt7PdqHz3',
