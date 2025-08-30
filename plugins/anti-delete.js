@@ -145,12 +145,19 @@ function getMediaFilename(messageContent) {
 
 // Handle message deletion detection
 async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
-  if (!antiDeleteConfig.enabled) {
+  if (!antiDeleteConfig.enabled) return
+
+  const messageEntry = messageTracker.get(deletedMessageId)
+  if (!messageEntry) {
+    // console.log(`❌ No tracked message found for ID: ${deletedMessageId}`)
     return
   }
 
-  // Check if the chat is a status broadcast, if so, ignore
+  // console.log(`🔍 Processing deletion for: ${deletedMessageId}`)
+
+  // Only process personal chats and groups (not status)
   if (chatJid.endsWith('@broadcast')) {
+    // console.log('⏭️ Skipping status deletion')
     return
   }
 
@@ -174,27 +181,19 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
     }
   }
 
-  // Check if message exists first to determine sender
-  let trackedMessage = messageTracker.get(deletedMessageId)
-
-  // If not found in memory, search in archived messages for sender info
-  if (!trackedMessage) {
-    trackedMessage = await searchArchivedMessage(deletedMessageId, chatJid)
-  }
-
   // If ignoring owner messages, check if the ORIGINAL SENDER was the owner
-  if (antiDeleteConfig.ignoreOwner && socket.user && trackedMessage) {
+  if (antiDeleteConfig.ignoreOwner && socket.user && messageEntry) {
     const ownerJid = socket.user.id
     const normalizedOwnerJid = normalizeJid(ownerJid)
-    const normalizedSenderJid = normalizeJid(trackedMessage.senderJid)
+    const normalizedSenderJid = normalizeJid(messageEntry.senderJid)
 
     // Skip only if the SENDER was the owner (not just if it's in owner's chat)
-    if (normalizedSenderJid === normalizedOwnerJid || trackedMessage.isFromOwner) {
+    if (normalizedSenderJid === normalizedOwnerJid || messageEntry.isFromOwner) {
       return
     }
   }
 
-  if (!trackedMessage) {
+  if (!messageEntry) {
     return
   }
 
@@ -215,16 +214,16 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
     if (!targetJid) return
 
     // Get sender name (remove @s.whatsapp.net and any numbers after ':')
-    const senderName = trackedMessage.senderJid.split('@')[0].split(':')[0]
+    const senderName = messageEntry.senderJid.split('@')[0].split(':')[0]
 
     // Create quoted message structure to make it look like a reply/tag
-    if (trackedMessage.text) {
+    if (messageEntry.text) {
       // Send the deleted message content as the new message, with empty quote
       const quotedMessage = {
-        text: trackedMessage.text,
+        text: messageEntry.text,
         contextInfo: {
-          stanzaId: trackedMessage.id,
-          participant: trackedMessage.senderJid,
+          stanzaId: messageEntry.id,
+          participant: messageEntry.senderJid,
           quotedMessage: {
             conversation: ""  // Empty quoted message
           }
@@ -236,14 +235,14 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
     // For media-only messages, don't send any text notification - just the media below
 
     // Send media if available with quoted context and empty quote
-    if (trackedMessage.mediaData && trackedMessage.mediaData.buffer) {
-      const mediaData = trackedMessage.mediaData
+    if (messageEntry.mediaData && messageEntry.mediaData.buffer) {
+      const mediaData = messageEntry.mediaData
       let mediaMessage = {}
 
       // Create contextInfo for media with empty quoted message
       const contextInfo = {
-        stanzaId: trackedMessage.id,
-        participant: trackedMessage.senderJid,
+        stanzaId: messageEntry.id,
+        participant: messageEntry.senderJid,
         quotedMessage: {
           conversation: ""  // Empty quoted message
         }
@@ -253,7 +252,7 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
         case 'image':
           mediaMessage = {
             image: mediaData.buffer,
-            caption: trackedMessage.text || "", // Use original caption if any, otherwise empty
+            caption: messageEntry.text || "", // Use original caption if any, otherwise empty
             mimetype: mediaData.mimetype,
             contextInfo: contextInfo
           }
@@ -261,7 +260,7 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
         case 'video':
           mediaMessage = {
             video: mediaData.buffer,
-            caption: trackedMessage.text || "", // Use original caption if any, otherwise empty
+            caption: messageEntry.text || "", // Use original caption if any, otherwise empty
             mimetype: mediaData.mimetype,
             contextInfo: contextInfo
           }

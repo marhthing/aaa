@@ -1,4 +1,3 @@
-
 const { bot } = require('../lib/client')
 const fs = require('fs-extra')
 const path = require('path')
@@ -15,7 +14,7 @@ async function loadRemotePlugins() {
         }
         return {}
     } catch (error) {
-        console.error('Failed to load remote plugins:', error)
+        // console.error('Failed to load remote plugins:', error)
         return {}
     }
 }
@@ -25,7 +24,7 @@ async function saveRemotePlugins(plugins) {
         await fs.ensureDir(path.dirname(REMOTE_PLUGINS_FILE))
         await fs.writeJson(REMOTE_PLUGINS_FILE, plugins, { spaces: 2 })
     } catch (error) {
-        console.error('Failed to save remote plugins:', error)
+        // console.error('Failed to save remote plugins:', error)
     }
 }
 
@@ -169,7 +168,7 @@ bot(
 
     try {
       const remotePlugins = await loadRemotePlugins()
-      
+
       if (!remotePlugins[pluginName]) {
         return await message.reply(`❌ Plugin "${pluginName}" not found in remote plugins registry`)
       }
@@ -218,13 +217,13 @@ bot(
 
     try {
       const remotePlugins = await loadRemotePlugins()
-      
+
       if (!remotePlugins[pluginName]) {
         return await message.reply(`❌ Plugin "${pluginName}" not found in remote plugins registry`)
       }
 
       const pluginInfo = remotePlugins[pluginName]
-      
+
       // Download updated plugin code
       await message.reply('📥 Downloading updated plugin from Gist...')
       const pluginCode = await downloadGist(pluginInfo.url)
@@ -271,11 +270,11 @@ bot(
       }
 
       let listMessage = '📋 *Installed Remote Plugins*\n\n'
-      
+
       for (const [name, info] of Object.entries(remotePlugins)) {
         const installedDate = new Date(info.installedAt).toLocaleDateString()
         const updatedDate = info.updatedAt ? ` (Updated: ${new Date(info.updatedAt).toLocaleDateString()})` : ''
-        
+
         listMessage += `🔹 **${name}**\n`
         listMessage += `   📁 ${info.fileName}\n`
         listMessage += `   📅 ${installedDate}${updatedDate}\n`
