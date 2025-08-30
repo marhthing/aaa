@@ -4,66 +4,96 @@ const config = require('../config')
 const fs = require('fs-extra')
 const path = require('path')
 
-// Store status media temporarily (persistent across reloads)
-let statusMediaCache
-try {
-  // Try to restore cache from global if it exists (for hot reloads)
-  statusMediaCache = global.statusMediaCache || new Map()
-  global.statusMediaCache = statusMediaCache
-} catch (error) {
-  statusMediaCache = new Map()
-}
+// No cache needed - we search media files directly
 
-// Function to rebuild cache from recent archived messages
-async function rebuildCacheFromArchive() {
+
+// Helper function to find media file by message ID (no cache needed)
+async function findMediaFileByMessageId(messageId) {
   try {
-    console.log('🔄 Rebuilding status cache from archived messages...')
+    const mediaTypes = ['image', 'video', 'audio', 'document', 'sticker']
     
-    // Look for today's archive file
-    const date = new Date()
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    
-    const archivePath = path.join(config.MESSAGES_DIR, year.toString(), month, 'individual', `${day}.json`)
-    
-    if (await fs.pathExists(archivePath)) {
-      const messages = await fs.readJson(archivePath)
-      let rebuilt = 0
+    for (const mediaType of mediaTypes) {
+      const mediaDir = path.join(config.MEDIA_DIR, mediaType)
       
-      // Find recent status messages with media
-      for (const msg of messages) {
-        if (msg.to === 'status@broadcast' && msg.hasMedia && msg.mediaPath) {
-          const messageId = msg.id
-          const mediaPath = msg.mediaPath
-          
-          // Check if file still exists
-          if (await fs.pathExists(mediaPath)) {
-            statusMediaCache.set(messageId, {
-              filePath: mediaPath,
-              type: msg.type,
-              mimetype: 'image/jpeg', // Default for now
-              timestamp: Date.now(),
-              caption: null,
-              archived: true
-            })
-            rebuilt++
-            console.log(`🔄 Rebuilt cache for: ${messageId} -> ${mediaPath}`)
+      if (await fs.pathExists(mediaDir)) {
+        const files = await fs.readdir(mediaDir)
+        
+        // Look for files that contain the message ID in filename
+        const matchingFile = files.find(file => file.includes(messageId))
+        
+        if (matchingFile) {
+          const fullPath = path.join(mediaDir, matchingFile)
+          return {
+            filePath: fullPath,
+            type: mediaType,
+            mimetype: getDefaultMimetype(mediaType),
+            fileName: matchingFile
           }
         }
       }
-      
-      console.log(`✅ Rebuilt ${rebuilt} status media entries in cache`)
-    } else {
-      console.log('⚠️ No archive file found for today')
     }
+    
+    return null
   } catch (error) {
-    console.error('Error rebuilding cache:', error)
+    console.error('Error finding media file:', error)
+    return null
   }
 }
 
-// Rebuild cache on startup
-rebuildCacheFromArchive()
+// Helper function to get default mimetype by media type
+function getDefaultMimetype(mediaType) {
+  switch (mediaType) {
+    case 'image': return 'image/jpeg'
+    case 'video': return 'video/mp4'
+    case 'audio': return 'audio/ogg'
+    case 'sticker': return 'image/webp'
+    case 'document': return 'application/octet-stream'
+    default: return 'application/octet-stream'
+  }
+}
+
+// Helper function to create media message from file info
+async function createMediaMessageFromFile(mediaFile) {
+  const message = {}
+  
+  try {
+    if (!mediaFile.filePath) {
+      throw new Error('No file path available')
+    }
+    
+    // Read media from file
+    const mediaBuffer = await fs.readFile(mediaFile.filePath)
+    
+    switch (mediaFile.type) {
+      case 'image':
+        message.image = mediaBuffer
+        break
+      case 'video':
+        message.video = mediaBuffer
+        break
+      case 'audio':
+        message.audio = mediaBuffer
+        message.mimetype = mediaFile.mimetype
+        break
+      case 'document':
+        message.document = mediaBuffer
+        message.mimetype = mediaFile.mimetype
+        break
+      case 'sticker':
+        message.sticker = mediaBuffer
+        break
+      default:
+        message.document = mediaBuffer
+        message.mimetype = mediaFile.mimetype
+    }
+    
+    return message
+    
+  } catch (error) {
+    console.error('Error reading media file:', error)
+    return { text: '❌ Media file not found' }
+  }
+}
 
 bot(
   {
@@ -105,24 +135,22 @@ bot(
         return await message.reply('❌ Unable to identify the status message')
       }
 
-      // Check if we have cached media for this status
-      console.log(`🔍 Checking cache for message ID: ${quotedMessageId}`)
-      console.log(`🔍 Cache has ${statusMediaCache.size} entries`)
-      console.log(`🔍 Cache keys: ${Array.from(statusMediaCache.keys()).join(', ')}`)
+      // Find media file directly from storage using message ID
+      console.log(`🔍 Searching for media file with message ID: ${quotedMessageId}`)
       
-      const cachedMedia = statusMediaCache.get(quotedMessageId)
-      console.log(`🔍 Cached media found: ${!!cachedMedia}`)
+      const mediaFile = await findMediaFileByMessageId(quotedMessageId)
+      console.log(`🔍 Media file found: ${!!mediaFile}`)
       
-      if (!cachedMedia) {
-        console.log('❌ No cached media found for this message ID')
-        return await message.reply('❌ No media found for this status. Media may have expired or not been cached.')
+      if (!mediaFile) {
+        console.log('❌ No media file found for this message ID')
+        return await message.reply('❌ No media found for this status. Media may have been deleted.')
       }
 
-      // Send the cached media to bot owner's personal chat
+      // Send the media to bot owner's personal chat
       const botOwnerJid = message.client.ownerJid
       console.log(`💾 Saving status media to bot owner's personal chat: ${botOwnerJid}`)
       
-      const mediaMessage = await createMediaMessage(cachedMedia)
+      const mediaMessage = await createMediaMessageFromFile(mediaFile)
       await message.client.socket.sendMessage(botOwnerJid, mediaMessage)
       
       await message.reply('✅ Status media saved to bot owner personal chat!')
@@ -161,16 +189,16 @@ bot(
         return await message.reply('❌ Unable to identify the status message')
       }
 
-      // Check if we have cached media for this status
-      const cachedMedia = statusMediaCache.get(quotedMessageId)
-      if (!cachedMedia) {
-        return await message.reply('❌ No media found for this status. Media may have expired or not been cached.')
+      // Find media file directly from storage using message ID
+      const mediaFile = await findMediaFileByMessageId(quotedMessageId)
+      if (!mediaFile) {
+        return await message.reply('❌ No media found for this status. Media may have been deleted.')
       }
 
-      // Send the cached media to specified JID
+      // Send the media to specified JID
       console.log(`💾 Sending status media to specified JID: ${targetJid}`)
       
-      const mediaMessage = await createMediaMessage(cachedMedia)
+      const mediaMessage = await createMediaMessageFromFile(mediaFile)
       await message.client.socket.sendMessage(targetJid, mediaMessage)
       
       await message.reply(`✅ Status media sent to ${targetJid}!`)
@@ -306,18 +334,18 @@ async function handleStatusReply(client, message) {
     const quotedMessageId = message.message?.extendedTextMessage?.contextInfo?.stanzaId
     if (!quotedMessageId) return
     
-    // Check if we have cached media for this status
-    const cachedMedia = statusMediaCache.get(quotedMessageId)
-    if (!cachedMedia) {
-      console.log(`📱 No cached media found for status reply: ${quotedMessageId}`)
+    // Find media file directly from storage using message ID
+    const mediaFile = await findMediaFileByMessageId(quotedMessageId)
+    if (!mediaFile) {
+      console.log(`📱 No media file found for status reply: ${quotedMessageId}`)
       return
     }
     
     const senderJid = message.key.participant || message.key.remoteJid
     console.log(`📤 Sending status media to ${senderJid} who requested: "${text}"`)
     
-    // Send the cached media to the requester
-    const mediaMessage = await createMediaMessage(cachedMedia)
+    // Send the media to the requester
+    const mediaMessage = await createMediaMessageFromFile(mediaFile)
     
     await client.socket.sendMessage(senderJid, mediaMessage)
     
@@ -375,52 +403,6 @@ function getMediaExtension(messageContent) {
   return '.bin'
 }
 
-// Helper function to create media message from cached data
-async function createMediaMessage(cachedMedia) {
-  const message = {}
-  
-  try {
-    if (!cachedMedia.filePath) {
-      throw new Error('No file path available for archived media')
-    }
-    
-    // Read media from the archived file
-    const mediaBuffer = await fs.readFile(cachedMedia.filePath)
-    
-    switch (cachedMedia.type) {
-      case 'image':
-        message.image = mediaBuffer
-        if (cachedMedia.caption) message.caption = cachedMedia.caption
-        break
-      case 'video':
-        message.video = mediaBuffer
-        if (cachedMedia.caption) message.caption = cachedMedia.caption
-        break
-      case 'audio':
-        message.audio = mediaBuffer
-        message.mimetype = cachedMedia.mimetype
-        break
-      case 'document':
-        message.document = mediaBuffer
-        message.mimetype = cachedMedia.mimetype
-        if (cachedMedia.caption) message.caption = cachedMedia.caption
-        break
-      case 'sticker':
-        message.sticker = mediaBuffer
-        break
-      default:
-        message.document = mediaBuffer
-        message.mimetype = cachedMedia.mimetype
-    }
-    
-    return message
-    
-  } catch (error) {
-    console.error('Error reading archived media file:', error)
-    // Return empty message if file reading fails
-    return { text: '❌ Media file not found in archive' }
-  }
-}
 
 // Hook into the client's message handling to intercept status updates and replies
 const originalHandleMessage = require('../lib/client').Client.prototype.handleMessage
