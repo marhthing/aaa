@@ -1,4 +1,3 @@
-
 const { bot } = require('../lib/client')
 const axios = require('axios')
 const fs = require('fs-extra')
@@ -23,7 +22,7 @@ bot(
     }
 
     try {
-      await message.reply('🔄 Downloading from TikTok...')
+      // Removed: await message.reply('🔄 Downloading from TikTok...')
 
       // Enhanced APIs with better reliability
       const APIs = [
@@ -73,22 +72,22 @@ bot(
             // Download video to temp file first (like ytv.js does)
             const tempFile = await downloadFromDirectUrl(videoUrl, message.key.id)
             if (tempFile) {
-              const caption = `🎵 *TikTok Video*\n\n` +
-                             `👤 **Author:** ${author}\n` +
-                             `📝 **Title:** ${title.substring(0, 100)}${title.length > 100 ? '...' : ''}\n` +
-                             `🔗 **Source:** TikTok`
+              // Removed: const caption = `🎵 *TikTok Video*\n\n` +
+              //              `👤 **Author:** ${author}\n` +
+              //              `📝 **Title:** ${title.substring(0, 100)}${title.length > 100 ? '...' : ''}\n` +
+              //              `🔗 **Source:** TikTok`
 
               // Send video from file (like ytv.js does)
               await message.client.socket.sendMessage(message.key.remoteJid, {
                 video: require('fs-extra').readFileSync(tempFile),
-                caption: caption
+                // Removed: caption: caption
               })
-              
+
               // Clean up temp file
               try {
                 require('fs-extra').unlinkSync(tempFile)
               } catch (e) {}
-              
+
               success = true
             }
           }
@@ -113,23 +112,23 @@ bot(
           // Parse HTML response for video URL
           const htmlContent = response.data
           const videoMatch = htmlContent.match(/href="([^"]*)" class="without_watermark"/)
-          
+
           if (videoMatch && videoMatch[1]) {
             const videoUrl = videoMatch[1]
             const titleMatch = htmlContent.match(/<p class="maintext">([^<]*)<\/p>/)
             const authorMatch = htmlContent.match(/<h2>([^<]*)<\/h2>/)
-            
+
             const title = titleMatch ? titleMatch[1].trim() : 'TikTok Video'
             const author = authorMatch ? authorMatch[1].trim() : 'Unknown'
 
-            const caption = `🎵 *TikTok Video*\n\n` +
-                           `👤 **Author:** ${author}\n` +
-                           `📝 **Title:** ${title.substring(0, 100)}${title.length > 100 ? '...' : ''}\n` +
-                           `🔗 **Source:** TikTok`
+            // Removed: const caption = `🎵 *TikTok Video*\n\n` +
+            //                `👤 **Author:** ${author}\n` +
+            //                `📝 **Title:** ${title.substring(0, 100)}${title.length > 100 ? '...' : ''}\n` +
+            //                `🔗 **Source:** TikTok`
 
             await message.reply('', {
               video: { url: videoUrl },
-              caption: caption
+              // Removed: caption: caption
             })
             success = true
           }
@@ -154,17 +153,17 @@ bot(
           // Parse HTML response for download link
           const htmlContent = response.data
           const videoMatch = htmlContent.match(/href="([^"]*)"[^>]*>.*?Download.*?Server.*?01/i)
-          
+
           if (videoMatch && videoMatch[1]) {
             const videoUrl = videoMatch[1]
-            
-            const caption = `🎵 *TikTok Video*\n\n` +
-                           `📝 **Title:** TikTok Video\n` +
-                           `🔗 **Source:** TikTok`
+
+            // Removed: const caption = `🎵 *TikTok Video*\n\n` +
+            //                `📝 **Title:** TikTok Video\n` +
+            //                `🔗 **Source:** TikTok`
 
             await message.reply('', {
               video: { url: videoUrl },
-              caption: caption
+              // Removed: caption: caption
             })
             success = true
           }
@@ -191,7 +190,7 @@ bot(
 
           // Extract video ID from URL
           const videoIdMatch = fullUrl.match(/\/video\/(\d+)/) || fullUrl.match(/\/v\/(\d+)/)
-          
+
           if (videoIdMatch && videoIdMatch[1]) {
             // Try alternative TikWM endpoint
             const altResponse = await axios.get(`https://tikwm.com/api/?url=${encodeURIComponent(fullUrl)}`, {
@@ -205,15 +204,15 @@ bot(
             if (altResponse.data && altResponse.data.code === 0 && altResponse.data.data) {
               const data = altResponse.data.data
               const videoUrl = data.play || data.wmplay
-              
+
               if (videoUrl) {
-                const caption = `🎵 *TikTok Video*\n\n` +
-                               `📝 **Title:** ${data.title || 'TikTok Video'}\n` +
-                               `🔗 **Source:** TikTok`
+                // Removed: const caption = `🎵 *TikTok Video*\n\n` +
+                //                `📝 **Title:** ${data.title || 'TikTok Video'}\n` +
+                //                `🔗 **Source:** TikTok`
 
                 await message.reply('', {
                   video: { url: videoUrl },
-                  caption: caption
+                  // Removed: caption: caption
                 })
                 success = true
               }
@@ -239,7 +238,7 @@ async function downloadFromDirectUrl(directUrl, messageId) {
   try {
     const videoDir = path.join(__dirname, '../data/downloads/video')
     await fs.ensureDir(videoDir)
-    
+
     const filename = `tiktok_${messageId}_${Date.now()}.mp4`
     const filepath = path.join(videoDir, filename)
 
