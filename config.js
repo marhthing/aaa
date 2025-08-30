@@ -29,7 +29,7 @@ module.exports = {
     SESSION_ID: (process.env.WHATSAPP_SESSION_ID || '').trim(),
     OWNER_JID: (process.env.OWNER_JID || '').trim(),
     PHONE_NUMBER: (process.env.PHONE_NUMBER || '').trim(),
-    AUTH_METHOD: process.env.AUTH_METHOD || '1',
+    AUTH_METHOD: process.env.AUTH_METHOD || 'pairing',
     SESSION_DIR: process.env.SESSION_DIR || path.join(__dirname, 'sessions'),
     
     // Core Features
