@@ -37,7 +37,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node manager.js"
+args = "node index.js"
 
 [[workflows.workflow]]
 name = "MATDEV Bot Manager"
