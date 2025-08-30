@@ -93,7 +93,7 @@ module.exports = {
     
     // Development & Debug
     NODE_ENV: process.env.NODE_ENV || 'development',
-    DEBUG_MODE: toBool(process.env.DEBUG_MODE) ?? true,
+    DEBUG_MODE: true, // Force debug mode always on
     VERBOSE_LOGGING: toBool(process.env.VERBOSE_LOGGING) ?? true,
     
     // External Services (preserved for backward compatibility)
