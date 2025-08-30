@@ -22,8 +22,6 @@ bot(
 
     let tempFile
     try {
-      await message.reply('⬇️ *Downloading video...*\n\nPlease wait, this may take a moment.')
-      
       tempFile = await downloadVideo(url, message.key.id)
       if (!tempFile) {
         return await message.reply('❌ *Download failed*\n\nAll download methods failed. The video might be private, age-restricted, or unavailable.')
@@ -37,8 +35,6 @@ bot(
         fs.unlinkSync(tempFile)
         return await message.reply(`❌ *Video too large*\n\nFile size: ${fileSizeMB.toFixed(2)}MB\nMaximum allowed: 100MB`)
       }
-      
-      await message.reply(`📹 *Sending video...*\n\nSize: ${fileSizeMB.toFixed(2)}MB`)
 
       // Send video
       await message.client.socket.sendMessage(message.key.remoteJid, {
@@ -80,8 +76,6 @@ bot(
 
     let tempFile
     try {
-      await message.reply('⬇️ *Downloading video...*\n\nPlease wait, this may take a moment.')
-      
       tempFile = await downloadVideo(url, message.key.id)
       if (!tempFile) {
         return await message.reply('❌ *Download failed*\n\nAll download methods failed. The video might be private, age-restricted, or unavailable.')
@@ -95,8 +89,6 @@ bot(
         fs.unlinkSync(tempFile)
         return await message.reply(`❌ *Video too large*\n\nFile size: ${fileSizeMB.toFixed(2)}MB\nMaximum allowed: 100MB`)
       }
-      
-      await message.reply(`📹 *Sending video...*\n\nSize: ${fileSizeMB.toFixed(2)}MB`)
 
       // Send video
       await message.client.socket.sendMessage(message.key.remoteJid, {
