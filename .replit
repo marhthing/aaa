@@ -8,7 +8,7 @@ channel = "stable-25_05"
 packages = ["glib", "gtk3", "nss", "libdrm", "mesa", "chromium", "unzipNLS"]
 
 [workflows]
-runButton = "Project"
+runButton = "MATDEV Bot with Manager"
 
 [[workflows.workflow]]
 name = "Project"
@@ -30,6 +30,15 @@ outputType = "console"
 task = "shell.exec"
 args = "node index.js"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "MATDEV Bot with Manager"
+author = 47049377
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node manager.js"
 
 [deployment]
 run = ["sh", "-c", "node index.js"]
