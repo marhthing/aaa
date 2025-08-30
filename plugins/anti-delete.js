@@ -48,8 +48,13 @@ async function trackMessage(message, messageText, socket) {
   const chatJid = message.key.remoteJid
   const isFromOwner = message.key.fromMe
   
+  console.log(`📝 Tracking message: ${messageId} from ${senderJid} in ${chatJid}`)
+  
   // Skip if ignoring owner messages and this is from owner
-  if (antiDeleteConfig.ignoreOwner && isFromOwner) return
+  if (antiDeleteConfig.ignoreOwner && isFromOwner) {
+    console.log(`⏭️ Skipping owner message: ${messageId}`)
+    return
+  }
   
   // Check if message has media and download it
   let mediaData = null
@@ -127,20 +132,36 @@ function getMediaFilename(messageContent) {
 
 // Handle message deletion detection
 async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
-  if (!antiDeleteConfig.enabled) return
+  console.log(`🗑️ Deletion handler called for: ${deletedMessageId} in ${chatJid}`)
+  
+  if (!antiDeleteConfig.enabled) {
+    console.log(`❌ Anti-delete disabled, skipping`)
+    return
+  }
   
   const trackedMessage = messageTracker.get(deletedMessageId)
-  if (!trackedMessage) return
+  if (!trackedMessage) {
+    console.log(`❌ Message not found in tracker: ${deletedMessageId}`)
+    console.log(`📊 Currently tracking ${messageTracker.size} messages`)
+    return
+  }
+  
+  console.log(`✅ Found deleted message in tracker: ${deletedMessageId}`)
   
   try {
     // Determine where to send the deleted message
     let targetJid = antiDeleteConfig.customJid
     
     if (!targetJid && antiDeleteConfig.sendToPersonal) {
-      // Send to user's personal chat
-      targetJid = trackedMessage.senderJid.includes('@g.us') 
-        ? trackedMessage.senderJid 
-        : trackedMessage.senderJid.split('@')[0] + '@s.whatsapp.net'
+      // Send to user's personal chat (ensure it's not a group JID)
+      if (trackedMessage.senderJid.endsWith('@g.us')) {
+        // If sender is from a group, we can't send to personal chat
+        // Skip or use the group chat itself
+        return
+      } else {
+        // Direct personal chat
+        targetJid = trackedMessage.senderJid
+      }
     }
     
     if (!targetJid) return
