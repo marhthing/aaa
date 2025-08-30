@@ -28,14 +28,14 @@ bot(
       await message.client.socket.sendMessage(message.key.remoteJid, {
         video: fs.readFileSync(tempFile)
       })
-      console.log('✅ Twitter video sent successfully')
+      // console.log('✅ Twitter video sent successfully')
     } catch (error) {
       console.error('❌ Error sending Twitter video:', error)
       await message.reply('❌ Failed to send video')
     } finally {
       try {
         fs.unlinkSync(tempFile)
-        console.log(`🗑️ Cleaned up: ${tempFile}`)
+        // console.log(`🗑️ Cleaned up: ${tempFile}`)
       } catch (e) {}
     }
   }
@@ -57,14 +57,14 @@ async function downloadTwitterVideo(url, messageId) {
 
   for (let i = 0; i < downloaders.length; i++) {
     try {
-      console.log(`🔄 Trying Twitter method ${i + 1}...`)
+      // console.log(`🔄 Trying Twitter method ${i + 1}...`)
       const result = await downloaders[i]()
       if (result) {
-        console.log(`✅ Twitter download successful with method ${i + 1}`)
+        // console.log(`✅ Twitter download successful with method ${i + 1}`)
         return result
       }
     } catch (error) {
-      console.log(`❌ Twitter method ${i + 1} failed:`, error.message)
+      // console.log(`❌ Twitter method ${i + 1} failed:`, error.message)
     }
   }
   return null

@@ -21,7 +21,7 @@ bot(
     }
 
 
-    
+
     const tempFile = await downloadVideo(url, message.key.id)
     if (!tempFile) {
       return await message.reply('❌ Download failed')
@@ -33,8 +33,8 @@ bot(
         video: fs.readFileSync(tempFile),
 
       })
-      
-      console.log('✅ Video sent successfully')
+
+      // console.log('✅ Video sent successfully')
     } catch (error) {
       console.error('❌ Error sending video:', error)
       await message.reply('❌ Failed to send video')
@@ -42,7 +42,7 @@ bot(
       // Always delete temp file
       try {
         fs.unlinkSync(tempFile)
-        console.log(`🗑️ Cleaned up: ${tempFile}`)
+        // console.log(`🗑️ Cleaned up: ${tempFile}`)
       } catch (e) {}
     }
   }
@@ -66,7 +66,7 @@ bot(
     }
 
 
-    
+
     const tempFile = await downloadVideo(url, message.key.id)
     if (!tempFile) {
       return await message.reply('❌ Download failed')
@@ -78,8 +78,8 @@ bot(
         video: fs.readFileSync(tempFile),
 
       })
-      
-      console.log('✅ Video sent successfully')
+
+      // console.log('✅ Video sent successfully')
     } catch (error) {
       console.error('❌ Error sending video:', error)
       await message.reply('❌ Failed to send video')
@@ -87,7 +87,7 @@ bot(
       // Always delete temp file
       try {
         fs.unlinkSync(tempFile)
-        console.log(`🗑️ Cleaned up: ${tempFile}`)
+        // console.log(`🗑️ Cleaned up: ${tempFile}`)
       } catch (e) {}
     }
   }
@@ -122,7 +122,7 @@ async function downloadVideo(url, messageId) {
       console.log(`❌ Method ${i + 1} failed:`, error.message)
     }
   }
-  
+
   return null
 }
 
@@ -130,19 +130,19 @@ async function downloadVideo(url, messageId) {
 async function downloadWithYtdl(url, messageId) {
   const videoDir = path.join(__dirname, '../data/downloads/video')
   await fs.ensureDir(videoDir)
-  
+
   const filename = `yt_${messageId}_${Date.now()}.mp4`
   const filepath = path.join(videoDir, filename)
 
   return new Promise((resolve, reject) => {
-    const stream = ytdl(url, { 
+    const stream = ytdl(url, {
       quality: 'highestvideo',
       filter: 'videoandaudio'
     })
-    
+
     const writeStream = fs.createWriteStream(filepath)
     stream.pipe(writeStream)
-    
+
     writeStream.on('finish', () => resolve(filepath))
     writeStream.on('error', reject)
     stream.on('error', reject)
@@ -171,7 +171,7 @@ async function downloadWithCobalt(url, messageId) {
 // Method 3: SaveFrom.net API
 async function downloadWithSavefrom(url, messageId) {
   const apiUrl = `https://api.savefrom.net/info?url=${encodeURIComponent(url)}`
-  
+
   const response = await axios.get(apiUrl, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -190,9 +190,9 @@ async function downloadWithSavefrom(url, messageId) {
 // Method 4: Generic web scraper
 async function downloadWithGeneric(url, messageId) {
   const apiUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://www.y2mate.com/mates/en68/analyze/ajax?url=${url}&q_auto=0&ajax=1`)}`
-  
+
   const response = await axios.get(apiUrl, { timeout: 30000 })
-  
+
   if (response.data?.contents) {
     const contents = JSON.parse(response.data.contents)
     if (contents.result?.includes('href=')) {
@@ -210,7 +210,7 @@ async function downloadWithGeneric(url, messageId) {
 async function downloadFromDirectUrl(directUrl, messageId) {
   const videoDir = path.join(__dirname, '../data/downloads/video')
   await fs.ensureDir(videoDir)
-  
+
   const filename = `yt_${messageId}_${Date.now()}.mp4`
   const filepath = path.join(videoDir, filename)
 

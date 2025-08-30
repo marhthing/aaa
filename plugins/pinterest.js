@@ -28,14 +28,14 @@ bot(
       await message.client.socket.sendMessage(message.key.remoteJid, {
         video: fs.readFileSync(tempFile)
       })
-      console.log('✅ Pinterest video sent successfully')
+      // console.log('✅ Pinterest video sent successfully')
     } catch (error) {
       console.error('❌ Error sending Pinterest video:', error)
       await message.reply('❌ Failed to send video')
     } finally {
       try {
         fs.unlinkSync(tempFile)
-        console.log(`🗑️ Cleaned up: ${tempFile}`)
+        // console.log(`🗑️ Cleaned up: ${tempFile}`)
       } catch (e) {}
     }
   }
@@ -58,14 +58,14 @@ async function downloadPinterestVideo(url, messageId) {
 
   for (let i = 0; i < downloaders.length; i++) {
     try {
-      console.log(`🔄 Trying Pinterest method ${i + 1}...`)
+      // console.log(`🔄 Trying Pinterest method ${i + 1}...`)
       const result = await downloaders[i]()
       if (result) {
-        console.log(`✅ Pinterest download successful with method ${i + 1}`)
+        // console.log(`✅ Pinterest download successful with method ${i + 1}`)
         return result
       }
     } catch (error) {
-      console.log(`❌ Pinterest method ${i + 1} failed:`, error.message)
+      // console.log(`❌ Pinterest method ${i + 1} failed:`, error.message)
     }
   }
   return null

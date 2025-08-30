@@ -38,7 +38,7 @@ async function saveBotReactionConfig() {
 // Initialize configuration
 async function initializeBotReactions() {
   await loadBotReactionConfig()
-  console.log('🎭 Bot reaction system initialized')
+  // console.log('🎭 Bot reaction system initialized')
 }
 
 bot(

@@ -52,7 +52,7 @@ bot(
         const stickerMessage = await newSticker.toMessage()
         await message.client.socket.sendMessage(message.key.remoteJid, stickerMessage)
         
-        console.log(`✅ Sticker taken with metadata: Pack="${packName}"`)
+        // console.log(`✅ Sticker taken with metadata: Pack="${packName}"`)
         
       } catch (stickerError) {
         console.error('❌ Failed to take sticker:', stickerError)

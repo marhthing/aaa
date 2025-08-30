@@ -71,7 +71,7 @@ bot(
         const stickerMessage = await sticker.toMessage()
         await message.client.socket.sendMessage(message.key.remoteJid, stickerMessage)
         
-        console.log(`✅ Sticker sent with metadata: Pack="${packName}", Author="${authorName}"`)
+        // console.log(`✅ Sticker sent with metadata: Pack="${packName}", Author="${authorName}"`)
         
         // Success reaction - check bot reaction config
         // For now, skip reactions until we fix the bot reaction system
