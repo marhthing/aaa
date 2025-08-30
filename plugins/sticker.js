@@ -51,7 +51,7 @@ bot(
       }
       
       // Get sticker pack name from environment or use bot name
-      const packName = process.env.STICKER_PACKNAME || 'MATDEV Bot'
+      const packName = process.env.STICKER_NAME || process.env.STICKER_PACKNAME || 'MATDEV Bot'
       const authorName = process.env.STICKER_AUTHOR || 'MATDEV Bot'
       
       // Create sticker with proper metadata using wa-sticker-formatter

@@ -5,7 +5,11 @@ const path = require('path')
 // Whitelist of user-editable environment variables
 const allowedEnvVars = [
   'STICKER_NAME',
-  'BOT_PREFIX',
+  'STICKER_PACKNAME', 
+  'STICKER_AUTHOR',
+  'PREFIX',
+  'BOT_NAME',
+  'BOT_ID',
   'TIMEZONE',
   'LANGUAGE',
   'AUTO_READ',
@@ -104,20 +108,15 @@ async function viewEnvironmentVariables(message) {
     }
     
     if (Object.keys(userVars).length === 0) {
-      return await message.reply(
-        '📝 *User Environment Variables:*\n\n' +
-        '_(No user variables set)_\n\n' +
-        '💡 Use `.env add KEY=value` to add variables'
-      )
+      return await message.reply('No variables set')
     }
     
-    let msg = '📝 *User Environment Variables:*\n\n'
+    let msg = ''
     for (const [key, value] of Object.entries(userVars)) {
-      msg += `• **${key}** = \`${value}\`\n`
+      msg += `${key} = ${value}\n`
     }
-    msg += '\n💡 Use `.env add` or `.env remove` to modify'
     
-    await message.reply(msg)
+    await message.reply(msg.trim())
     
   } catch (error) {
     console.error('❌ Error viewing env vars:', error)
