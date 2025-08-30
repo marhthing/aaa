@@ -8,6 +8,10 @@ const start = async () => {
         
         // Create and connect bot client
         const bot = new Client()
+        
+        // Small delay to ensure proper initialization
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
         await bot.connect()
         
         // Setup graceful shutdown
