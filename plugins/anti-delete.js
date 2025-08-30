@@ -50,13 +50,21 @@ async function trackMessage(message, messageText, socket) {
   const senderJid = message.key.participant || message.key.remoteJid
   const chatJid = message.key.remoteJid
   const isFromOwner = message.key.fromMe
-  
-  console.log(`📝 Tracking message: ${messageId} from ${senderJid} in ${chatJid}`)
+  const isGroup = chatJid.endsWith('@g.us')
   
   // Skip if ignoring owner messages and this is from owner
   if (antiDeleteConfig.ignoreOwner && isFromOwner) {
-    console.log(`⏭️ Skipping owner message tracking in memory: ${messageId}`)
     return
+  }
+
+  // Only track messages in groups or from non-owners (where deletion detection matters)
+  if (!isGroup && isFromOwner) {
+    return // Don't track owner's personal messages
+  }
+  
+  // Only log tracking for debugging, not every message
+  if (process.env.DEBUG_ANTI_DELETE === 'true') {
+    console.log(`📝 Tracking message: ${messageId} from ${senderJid} in ${chatJid}`)
   }
   
   // Check if message has media and download it
