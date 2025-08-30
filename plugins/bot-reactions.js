@@ -57,16 +57,8 @@ bot(
     
     if (!param) {
       // Show current status
-      const status = botReactionConfig.enabled ? '🟢 ON' : '🔴 OFF'
-      
-      return await message.reply(
-        `🎭 *Bot Auto-Reactions Status*\n\n` +
-        `Status: ${status}\n\n` +
-        `*Commands:*\n` +
-        `• \`.br on\` - Enable auto-reactions\n` +
-        `• \`.br off\` - Disable auto-reactions\n` +
-        `• \`.br\` - Show current status`
-      )
+      const status = botReactionConfig.enabled ? 'ON' : 'OFF'
+      return await message.reply(status)
     }
     
     if (param === 'on') {
