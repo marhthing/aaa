@@ -16,14 +16,11 @@ let isPairingMode = false
 // Uncomment the following lines if you want to enable auto-clone from GitHub
 /*
 const GITHUB_REPO = 'https://github.com/marhthing/aaa.git'
-const CLONE_DIR = 'aaa'
-const SESSION_ID = 'updateThis' // Edit this line only, don't remove
 
 // Function to install dependencies
 function installDependencies() {
     console.log('Installing dependencies...')
     const installResult = spawnSync('npm', ['install', '--force'], {
-        cwd: CLONE_DIR,
         stdio: 'inherit',
         env: { ...process.env, CI: 'true' }
     })
@@ -38,13 +35,12 @@ function installDependencies() {
 
 // Function to check dependencies
 function checkDependencies() {
-    if (!existsSync(path.resolve(`${CLONE_DIR}/package.json`))) {
+    if (!existsSync(path.resolve('package.json'))) {
         console.error('package.json not found!')
         process.exit(1)
     }
 
     const result = spawnSync('npm', ['ls'], {
-        cwd: CLONE_DIR,
         stdio: 'inherit',
     })
 
@@ -57,7 +53,7 @@ function checkDependencies() {
 // Function to clone repository
 function cloneRepository() {
     console.log('Cloning the repository...')
-    const cloneResult = spawnSync('git', ['clone', GITHUB_REPO, CLONE_DIR], {
+    const cloneResult = spawnSync('git', ['clone', GITHUB_REPO, '.'], {
         stdio: 'inherit',
     })
 
@@ -65,20 +61,12 @@ function cloneRepository() {
         throw new Error(`Failed to clone the repository: ${cloneResult.error.message}`)
     }
 
-    const configPath = `${CLONE_DIR}/.env`
-    try {
-        console.log('Writing to .env...')
-        writeFileSync(configPath, `SESSION_ID=${SESSION_ID}\nBOT_NAME=MATDEV`)
-    } catch (err) {
-        throw new Error(`Failed to write to .env: ${err.message}`)
-    }
-
     installDependencies()
 }
 
 // GitHub auto-clone logic - COMMENTED OUT
 // Uncomment these lines if you want to enable auto-clone
-// if (!existsSync(CLONE_DIR)) {
+// if (!existsSync('package.json')) {
 //     cloneRepository()
 //     checkDependencies()
 // } else {
