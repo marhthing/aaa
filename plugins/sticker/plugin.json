@@ -1,0 +1,10 @@
+{
+  "name": "sticker",
+  "version": "1.0.0",
+  "description": "Convert images and videos to stickers",
+  "author": "MATDEV Bot",
+  "main": "index.js",
+  "dependencies": ["sharp", "fluent-ffmpeg"],
+  "commands": ["sticker"],
+  "enabled": true
+}
