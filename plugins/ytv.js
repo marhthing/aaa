@@ -135,6 +135,7 @@ function extractVideoId(url) {
 
 async function downloadVideo(url, messageId) {
   const downloaders = [
+    { name: 'Web Service API', func: () => downloadWithWebService(url, messageId) },
     { name: 'ytdl-core', func: () => downloadWithYtdl(url, messageId) },
     { name: 'Alternative API', func: () => downloadWithCobalt(url, messageId) },
     { name: 'Y2mate', func: () => downloadWithSavefrom(url, messageId) },
@@ -167,6 +168,68 @@ async function downloadVideo(url, messageId) {
   console.log('❌ All download methods failed:')
   errors.forEach((error, index) => console.log(`  ${index + 1}. ${error}`))
   return null
+}
+
+// Method 0: Web Service API - Works better on hosting platforms
+async function downloadWithWebService(url, messageId) {
+  try {
+    // Use yt-dlp web service that handles bot detection better
+    const serviceUrl = 'https://loader.to/ajax/download.php'
+    
+    // Extract video ID
+    const videoId = extractVideoId(url)
+    if (!videoId) throw new Error('Invalid YouTube URL')
+    
+    const response = await axios.post(serviceUrl, {
+      id: videoId,
+      v: videoId,
+      format: '720',
+      color: 'FF0000',
+      token: '',
+      timeExpire: Math.floor(Date.now() / 1000) + 3600
+    }, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Origin': 'https://loader.to',
+        'Referer': 'https://loader.to/',
+        'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-origin',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      timeout: 30000
+    })
+
+    if (response.data?.url) {
+      return await downloadFromDirectUrl(response.data.url, messageId)
+    }
+    
+    // Try alternative web service
+    const altResponse = await axios.get(`https://api.savemp3.cc/api/convert?url=${encodeURIComponent(url)}&format=mp4&quality=720`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Referer': 'https://savemp3.cc/',
+        'Origin': 'https://savemp3.cc'
+      },
+      timeout: 30000
+    })
+    
+    if (altResponse.data?.download_url) {
+      return await downloadFromDirectUrl(altResponse.data.download_url, messageId)
+    }
+    
+    throw new Error('Web service APIs unavailable')
+  } catch (error) {
+    throw new Error(`Web Service API: ${error.message}`)
+  }
 }
 
 // Method 1: ytdl-core with better error handling and anti-bot detection

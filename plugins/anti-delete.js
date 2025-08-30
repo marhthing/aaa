@@ -46,11 +46,24 @@ async function trackMessage(message, messageText, socket) {
   if (!antiDeleteConfig.enabled) return
 
   const messageId = message.key.id
-  const senderJid = message.key.participant || message.key.remoteJid
   const chatJid = message.key.remoteJid
   const isFromOwner = message.key.fromMe
   const isGroup = chatJid.endsWith('@g.us')
   const isStatus = chatJid.endsWith('@broadcast')
+  
+  // Proper sender JID detection
+  let senderJid
+  if (isGroup) {
+    // In groups, participant is the actual sender
+    senderJid = message.key.participant || message.key.remoteJid
+  } else {
+    // In personal chats, use the remoteJid if message is incoming, or our own JID if outgoing
+    if (isFromOwner) {
+      senderJid = socket.user?.id || message.key.remoteJid // Our own JID
+    } else {
+      senderJid = message.key.remoteJid // The other person's JID
+    }
+  }
 
   // Skip if ignoring owner messages and this is from owner
   if (antiDeleteConfig.ignoreOwner && isFromOwner) {
