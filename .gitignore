@@ -1,3 +1,5 @@
 data/
 sessions/
 node_modules
+.env
+.env.system
