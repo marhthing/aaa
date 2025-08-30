@@ -1,177 +1,151 @@
 const { bot } = require('../lib/client')
-const fs = require('fs-extra')
-const path = require('path')
 const axios = require('axios')
 
 bot(
   {
     pattern: 'instagram ?(.*)',
-    desc: 'Download Instagram video',
-    type: 'downloader',
+    desc: 'Download Instagram video/photo',
+    type: 'media',
   },
   async (message, match) => {
+    if (!match || !match.trim()) {
+      return await message.reply('❌ Please provide an Instagram URL\n\nUsage: `.instagram <instagram_url>`')
+    }
+
     const url = match.trim()
-    if (!url) {
-      return await message.reply('❌ Provide Instagram URL')
+
+    // Validate Instagram URL
+    if (!url.includes('instagram.com')) {
+      return await message.reply('❌ Please provide a valid Instagram URL')
     }
 
-    if (!isValidInstagramUrl(url)) {
-      return await message.reply('❌ Invalid Instagram URL')
-    }
-
-    const tempFile = await downloadInstagramVideo(url, message.key.id)
-    if (!tempFile) {
-      return await message.reply('❌ Download failed')
-    }
+    await message.react('⏳')
 
     try {
-      await message.client.socket.sendMessage(message.key.remoteJid, {
-        video: fs.readFileSync(tempFile)
-      })
-      console.log('✅ Instagram video sent successfully')
-    } catch (error) {
-      console.error('❌ Error sending Instagram video:', error)
-      await message.reply('❌ Failed to send video')
-    } finally {
+      // Method 1: Using RapidAPI Instagram Downloader
+      await message.reply('🔄 Downloading from Instagram...')
+
+      const options = {
+        method: 'GET',
+        url: 'https://instagram-downloader-download-instagram-videos-stories.p.rapidapi.com/index',
+        params: { url: url },
+        headers: {
+          'X-RapidAPI-Key': 'f2d0d9da7emsh4f7d8c0b0e7e5f0p1c4b2djsn8f7b9a5d2c3e',
+          'X-RapidAPI-Host': 'instagram-downloader-download-instagram-videos-stories.p.rapidapi.com'
+        }
+      }
+
+      const response = await axios.request(options)
+
+      if (response.data && response.data.media && response.data.media.length > 0) {
+        const media = response.data.media[0]
+        const mediaUrl = media.url
+        const mediaType = media.type || 'image'
+
+        if (mediaUrl) {
+          const caption = `📸 *Instagram ${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)}*\n\n` +
+                         `👤 **User:** ${response.data.title || 'Unknown'}\n` +
+                         `📱 **Type:** ${mediaType}\n` +
+                         `🔗 **Source:** Instagram`
+
+          await message.react('✅')
+
+          if (mediaType === 'video') {
+            return await message.send('', {
+              video: { url: mediaUrl },
+              caption: caption
+            })
+          } else {
+            return await message.send('', {
+              image: { url: mediaUrl },
+              caption: caption
+            })
+          }
+        }
+      }
+
+      // Method 2: Fallback using different API
       try {
-        fs.unlinkSync(tempFile)
-        console.log(`🗑️ Cleaned up: ${tempFile}`)
-      } catch (e) {}
+        const fallbackResponse = await axios.get(`https://api.instagram-downloader.net/download?url=${encodeURIComponent(url)}`)
+
+        if (fallbackResponse.data && fallbackResponse.data.download_url) {
+          const downloadUrl = fallbackResponse.data.download_url
+          const mediaType = fallbackResponse.data.type || 'image'
+
+          const caption = `📸 *Instagram ${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)}*\n\n` +
+                         `📱 **Type:** ${mediaType}\n` +
+                         `🔗 **Source:** Instagram`
+
+          await message.react('✅')
+
+          if (mediaType === 'video' || downloadUrl.includes('.mp4')) {
+            return await message.send('', {
+              video: { url: downloadUrl },
+              caption: caption
+            })
+          } else {
+            return await message.send('', {
+              image: { url: downloadUrl },
+              caption: caption
+            })
+          }
+        }
+      } catch (fallbackError) {
+        console.error('Instagram fallback method failed:', fallbackError.message)
+      }
+
+      // Method 3: Another fallback
+      try {
+        const response3 = await axios.post('https://saveig.app/api/ajaxSearch', 
+          `q=${encodeURIComponent(url)}&t=media&lang=en`,
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+          }
+        )
+
+        if (response3.data && response3.data.data) {
+          // Parse HTML response to extract download links
+          const htmlData = response3.data.data
+          const videoMatch = htmlData.match(/<a[^>]*href="([^"]*)"[^>]*>Download Video<\/a>/)
+          const imageMatch = htmlData.match(/<a[^>]*href="([^"]*)"[^>]*>Download Image<\/a>/)
+
+          if (videoMatch || imageMatch) {
+            const downloadUrl = videoMatch ? videoMatch[1] : imageMatch[1]
+            const mediaType = videoMatch ? 'video' : 'image'
+
+            const caption = `📸 *Instagram ${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)}*\n\n` +
+                           `📱 **Type:** ${mediaType}\n` +
+                           `🔗 **Source:** Instagram`
+
+            await message.react('✅')
+
+            if (mediaType === 'video') {
+              return await message.send('', {
+                video: { url: downloadUrl },
+                caption: caption
+              })
+            } else {
+              return await message.send('', {
+                image: { url: downloadUrl },
+                caption: caption
+              })
+            }
+          }
+        }
+      } catch (error3) {
+        console.error('Instagram method 3 failed:', error3.message)
+      }
+
+      await message.react('❌')
+      return await message.reply('❌ Failed to download Instagram media. The post might be private or the link is invalid.')
+
+    } catch (error) {
+      console.error('Instagram download error:', error)
+      await message.react('❌')
+      return await message.reply('❌ Failed to download Instagram media. Please try again later.')
     }
   }
 )
-
-function isValidInstagramUrl(url) {
-  const patterns = [
-    /^https?:\/\/(www\.)?instagram\.com\/p\/[A-Za-z0-9_-]+/,
-    /^https?:\/\/(www\.)?instagram\.com\/reel\/[A-Za-z0-9_-]+/,
-    /^https?:\/\/(www\.)?instagram\.com\/tv\/[A-Za-z0-9_-]+/
-  ]
-  return patterns.some(pattern => pattern.test(url))
-}
-
-async function downloadInstagramVideo(url, messageId) {
-  const downloaders = [
-    () => downloadWithSnapInsta(url, messageId),
-    () => downloadWithIgram(url, messageId),
-    () => downloadWithApiInsta(url, messageId)
-  ]
-
-  for (let i = 0; i < downloaders.length; i++) {
-    try {
-      console.log(`🔄 Trying Instagram method ${i + 1}...`)
-      const result = await downloaders[i]()
-      if (result) {
-        console.log(`✅ Instagram download successful with method ${i + 1}`)
-        return result
-      }
-    } catch (error) {
-      console.log(`❌ Instagram method ${i + 1} failed:`, error.message)
-    }
-  }
-  return null
-}
-
-async function downloadWithSnapInsta(url, messageId) {
-  const response = await axios.get(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    },
-    timeout: 30000
-  })
-
-  // Direct scraping from Instagram page
-  const patterns = [
-    /"video_url":"([^"]+)"/,
-    /property="og:video" content="([^"]+)"/,
-    /"contentUrl":"([^"]+)"/,
-    /property="og:video:secure_url" content="([^"]+)"/
-  ]
-  
-  for (const pattern of patterns) {
-    const match = response.data.match(pattern)
-    if (match?.[1]) {
-      const videoUrl = match[1].replace(/\\u0026/g, '&').replace(/\\/g, '')
-      return await downloadFromDirectUrl(videoUrl, messageId, 'ig_direct_')
-    }
-  }
-  throw new Error('No video URL from direct scraping')
-}
-
-async function downloadWithIgram(url, messageId) {
-  const response = await axios.post('https://v3.igdownloader.app/api/ajaxSearch', {
-    q: url,
-    t: 'media',
-    lang: 'en'
-  }, {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    },
-    timeout: 30000
-  })
-
-  // Parse HTML response for video links
-  const patterns = [
-    /href="([^"]+)"[^>]*>.*?Download video/i,
-    /data-href="([^"]+)"/,
-    /onclick="window\.open\('([^']+)'/
-  ]
-  
-  for (const pattern of patterns) {
-    const match = response.data.match(pattern)
-    if (match?.[1] && match[1].includes('cdninstagram')) {
-      return await downloadFromDirectUrl(match[1], messageId, 'ig_igram_')
-    }
-  }
-  throw new Error('No video URL from IGDownloader')
-}
-
-async function downloadWithApiInsta(url, messageId) {
-  const response = await axios.post('https://api-insta.com/api/media', {
-    url: url
-  }, {
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    },
-    timeout: 30000
-  })
-
-  if (response.data?.data?.video_url) {
-    return await downloadFromDirectUrl(response.data.data.video_url, messageId, 'ig_apiinsta_')
-  }
-  
-  // Try alternative response format
-  if (response.data?.video_url) {
-    return await downloadFromDirectUrl(response.data.video_url, messageId, 'ig_apiinsta_')
-  }
-  
-  throw new Error('No video URL from API-Insta')
-}
-
-async function downloadFromDirectUrl(directUrl, messageId, prefix) {
-  const videoDir = path.join(__dirname, '../data/downloads/video')
-  await fs.ensureDir(videoDir)
-  
-  const filename = `${prefix}${messageId}_${Date.now()}.mp4`
-  const filepath = path.join(videoDir, filename)
-
-  const response = await axios({
-    method: 'GET',
-    url: directUrl,
-    responseType: 'stream',
-    timeout: 60000,
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    }
-  })
-
-  const writer = fs.createWriteStream(filepath)
-  response.data.pipe(writer)
-
-  return new Promise((resolve, reject) => {
-    writer.on('finish', () => resolve(filepath))
-    writer.on('error', reject)
-  })
-}
