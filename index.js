@@ -121,13 +121,21 @@ function cloneRepository() {
         process.exit(1)
     }
 
-    // Move contents from temp directory to current directory (excluding this manager)
+    // Move contents from temp directory to current directory (excluding this manager and data folder)
     console.log('📦 Moving bot files to current directory...')
 
     // Create a backup of this manager script
     const managerBackup = 'manager_backup.js'
     if (existsSync('index.js')) {
         spawnSync('cp', ['index.js', managerBackup], { stdio: 'inherit' })
+    }
+
+    // Backup data folder if it exists
+    let dataBackup = null
+    if (existsSync('data')) {
+        dataBackup = 'data_backup_' + Date.now()
+        spawnSync('mv', ['data', dataBackup], { stdio: 'inherit' })
+        console.log('📁 Backed up data folder to preserve user data')
     }
 
     const moveResult = spawnSync('bash', ['-c', `cp -r ${tempDir}/* . && cp -r ${tempDir}/.[^.]* . 2>/dev/null || true`], {
@@ -137,6 +145,15 @@ function cloneRepository() {
     if (moveResult.error) {
         console.error('❌ Failed to move repository contents:', moveResult.error.message)
         process.exit(1)
+    }
+
+    // Restore data folder if we backed it up
+    if (dataBackup && existsSync(dataBackup)) {
+        if (existsSync('data')) {
+            spawnSync('rm', ['-rf', 'data'], { stdio: 'inherit' }) // Remove cloned data folder
+        }
+        spawnSync('mv', [dataBackup, 'data'], { stdio: 'inherit' })
+        console.log('📁 Restored original data folder')
     }
 
     // Restore this manager script if it was overwritten

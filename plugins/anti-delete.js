@@ -213,17 +213,15 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
 
     if (!targetJid) return
 
-    // Get sender name (remove @s.whatsapp.net and any numbers after ':')
-    const senderName = messageEntry.senderJid.split('@')[0].split(':')[0]
-
     // Create quoted message structure to make it look like a reply/tag
     if (messageEntry.text) {
       // Send the deleted message content as the new message, with empty quote
+      // Use the original sender's JID in participant to show correct tag
       const quotedMessage = {
         text: messageEntry.text,
         contextInfo: {
           stanzaId: messageEntry.id,
-          participant: messageEntry.senderJid,
+          participant: messageEntry.senderJid, // This should show the actual sender
           quotedMessage: {
             conversation: ""  // Empty quoted message
           }
