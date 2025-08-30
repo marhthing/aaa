@@ -123,7 +123,7 @@ bot(
     try {
       // Check if this is a reply to a status
       const quotedMessage = message.message?.extendedTextMessage?.contextInfo?.quotedMessage
-      
+      // console.log('📋 Quoted message check:', !!quotedMessage)
 
       if (!quotedMessage) {
         return await message.reply('❌ Please reply to a status message with .save to save the media')
@@ -131,30 +131,31 @@ bot(
 
       // Get the quoted message ID
       const quotedMessageId = message.message?.extendedTextMessage?.contextInfo?.stanzaId
-      
+      // console.log('🆔 Quoted message ID:', quotedMessageId)
 
       if (!quotedMessageId) {
         return await message.reply('❌ Unable to identify the status message')
       }
 
       // Find media file directly from storage using message ID
-      
+      // console.log('🔍 Searching for media file with ID:', quotedMessageId)
 
       const mediaFile = await findMediaFileByMessageId(quotedMessageId)
-      
+      // console.log('📁 Media file found:', !!mediaFile)
 
       if (!mediaFile) {
+        // console.log('❌ No media file found for message ID:', quotedMessageId)
         return
       }
 
       // Send the media to bot owner's personal chat
       const botOwnerJid = message.client.ownerJid
-      
+      // console.log('📨 Sending media to owner:', botOwnerJid)
 
       const mediaMessage = await createMediaMessageFromFile(mediaFile)
       await message.client.socket.sendMessage(botOwnerJid, mediaMessage)
 
-      
+      // console.log('✅ Status media saved successfully')
 
     } catch (error) {
       console.error('❌ Error saving status media:', error)
@@ -196,12 +197,12 @@ bot(
       }
 
       // Send the media to specified JID
-      
+
 
       const mediaMessage = await createMediaMessageFromFile(mediaFile)
       await message.client.socket.sendMessage(targetJid, mediaMessage)
 
-      
+
 
     } catch (error) {
       console.error('Error sending status media to JID:', error)
@@ -216,7 +217,7 @@ async function handleStatusUpdate(client, message) {
     // Deduplication check
     const messageId = message.key.id
     if (processedMessages.has(messageId)) {
-      
+
       return
     }
     processedMessages.add(messageId)
@@ -227,24 +228,24 @@ async function handleStatusUpdate(client, message) {
       entries.slice(0, 50).forEach(id => processedMessages.delete(id))
     }
 
-    
+
 
     // Check if this is a status update from the bot owner
     const isStatusUpdate = message.key.remoteJid === 'status@broadcast'
     const senderJid = message.key.participant || message.key.remoteJid
     const isFromOwner = client.isOwnerJid(senderJid)
 
-    
-    
+
+
 
     if (!isStatusUpdate) return
 
     // Check if status contains media
     if (client.hasMedia(message.message)) {
       const userType = isFromOwner ? 'Owner' : 'User'
-      
+
     } else {
-      
+
     }
 
   } catch (error) {
@@ -259,7 +260,7 @@ async function handleStatusReply(client, message) {
     // Deduplication check for reply processing
     const replyId = message.key.id
     if (processedReplies.has(replyId)) {
-      
+
       return
     }
     processedReplies.add(replyId)
@@ -292,19 +293,19 @@ async function handleStatusReply(client, message) {
     // Find media file directly from storage using message ID
     const mediaFile = await findMediaFileByMessageId(quotedMessageId)
     if (!mediaFile) {
-      
+
       return
     }
 
     const senderJid = message.key.participant || message.key.remoteJid
-    
+
 
     // Send the media to the requester
     const mediaMessage = await createMediaMessageFromFile(mediaFile)
 
     await client.socket.sendMessage(senderJid, mediaMessage)
 
-    
+
 
   } catch (error) {
     console.error('Error handling status reply:', error)
