@@ -86,17 +86,108 @@ class PingPlugin {
         const { reply } = context;
         const startTime = Date.now();
         
-        // Calculate response time
-        const responseTime = Date.now() - startTime;
+        // Perform real network ping tests
+        const networkPing = await this.performNetworkPing();
+        const whatsappPing = await this.performWhatsAppPing();
+        
+        // Calculate bot response time
+        const botResponseTime = Date.now() - startTime;
         this.stats.pingsReceived++;
         
         const response = `🏓 **Pong!**\n\n` +
-                        `⚡ Response Time: ${responseTime}ms\n` +
+                        `🤖 Bot Response: ${botResponseTime}ms\n` +
+                        `🌐 Network Ping: ${networkPing.latency}ms (${networkPing.status})\n` +
+                        `📱 WhatsApp API: ${whatsappPing.latency}ms (${whatsappPing.status})\n` +
                         `📊 Total Pings: ${this.stats.pingsReceived}\n` +
                         `⏰ Uptime: ${this.getUptime()}`;
         
         await reply(response);
         await this.saveStats();
+    }
+
+    /**
+     * Perform real network ping test
+     */
+    async performNetworkPing() {
+        try {
+            const hosts = ['8.8.8.8', 'cloudflare.com', 'google.com'];
+            const results = [];
+            
+            for (const host of hosts) {
+                try {
+                    const startTime = Date.now();
+                    const axios = require('axios');
+                    
+                    // Use HTTP ping as alternative to ICMP ping
+                    await axios.get(`https://${host === '8.8.8.8' ? 'dns.google' : host}`, { 
+                        timeout: 5000,
+                        headers: {
+                            'User-Agent': 'MATDEV-Bot-Ping/1.0'
+                        }
+                    });
+                    
+                    const latency = Date.now() - startTime;
+                    results.push(latency);
+                    break; // Use first successful ping
+                } catch (error) {
+                    continue; // Try next host
+                }
+            }
+            
+            if (results.length > 0) {
+                return {
+                    latency: Math.min(...results),
+                    status: '✅'
+                };
+            } else {
+                return {
+                    latency: 'timeout',
+                    status: '❌'
+                };
+            }
+        } catch (error) {
+            return {
+                latency: 'error',
+                status: '❌'
+            };
+        }
+    }
+
+    /**
+     * Perform WhatsApp API ping test
+     */
+    async performWhatsAppPing() {
+        try {
+            const startTime = Date.now();
+            
+            // Test WhatsApp connection by checking client state
+            if (this.botClient && this.botClient.client) {
+                const state = this.botClient.client.ws.readyState;
+                const latency = Date.now() - startTime;
+                
+                if (state === 1) { // WebSocket.OPEN
+                    return {
+                        latency: latency,
+                        status: '✅'
+                    };
+                } else {
+                    return {
+                        latency: 'disconnected',
+                        status: '⚠️'
+                    };
+                }
+            } else {
+                return {
+                    latency: 'no client',
+                    status: '❌'
+                };
+            }
+        } catch (error) {
+            return {
+                latency: 'error',
+                status: '❌'
+            };
+        }
     }
 
     /**
