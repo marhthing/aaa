@@ -20,122 +20,35 @@ bot(
       return await message.reply('❌ Please provide a valid TikTok URL')
     }
 
-    await message.react('⏳')
-
     try {
       await message.reply('🔄 Downloading from TikTok...')
 
-      // Method 1: Using TikTok Scraper API (Free)
+      // Working APIs in order of preference
+      const APIs = [
+        'https://api.douyin.pro/api/douyin',
+        'https://api.tiklydown.eu.org/api/download',
+        'https://www.tikwm.com/api/?url='
+      ]
+
+      let success = false
+
+      // Method 1: Douyin Pro API
       try {
-        const response = await axios.post('https://lovetik.com/api/ajax/search', {
-          query: url
-        }, {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Referer': 'https://lovetik.com/'
-          }
-        })
-
-        if (response.data && response.data.links && response.data.links.length > 0) {
-          const videoData = response.data.links[0]
-          const videoUrl = videoData.a || videoData.url
-          const title = response.data.desc || 'TikTok Video'
-          const author = response.data.author || 'Unknown'
-
-          if (videoUrl) {
-            const caption = `🎵 *TikTok Video*\n\n` +
-                           `👤 **Author:** ${author}\n` +
-                           `📝 **Title:** ${title}\n` +
-                           `🔗 **Source:** TikTok`
-
-            await message.react('✅')
-            return await message.send('', {
-              video: { url: videoUrl },
-              caption: caption
-            })
-          }
-        }
-      } catch (error1) {
-        console.error('Lovetik method failed:', error1.message)
-      }
-
-      // Method 2: Using TikMate API (Free alternative)
-      try {
-        const response2 = await axios.post('https://tikmate.online/download/link', {
+        const response = await axios.post(APIs[0], {
           url: url
         }, {
           headers: {
             'Content-Type': 'application/json',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-          }
-        })
-
-        if (response2.data && response2.data.success && response2.data.video_url) {
-          const videoUrl = response2.data.video_url
-          const title = response2.data.title || 'TikTok Video'
-          const author = response2.data.author || 'Unknown'
-
-          const caption = `🎵 *TikTok Video*\n\n` +
-                         `👤 **Author:** ${author}\n` +
-                         `📝 **Title:** ${title}\n` +
-                         `🔗 **Source:** TikTok`
-
-          await message.react('✅')
-          return await message.send('', {
-            video: { url: videoUrl },
-            caption: caption
-          })
-        }
-      } catch (error2) {
-        console.error('TikMate method failed:', error2.message)
-      }
-
-      // Method 3: Using SaveTT API (Free alternative)
-      try {
-        const response3 = await axios.get(`https://savett.cc/api/ajaxSearch`, {
-          params: {
-            q: url,
-            lang: 'en'
           },
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-          }
+          timeout: 15000
         })
 
-        if (response3.data && response3.data.status === 'ok' && response3.data.links) {
-          const videoLink = response3.data.links.find(link => link.s && link.s.includes('mp4'))
-          if (videoLink && videoLink.a) {
-            const caption = `🎵 *TikTok Video*\n\n🔗 **Source:** TikTok`
-
-            await message.react('✅')
-            return await message.send('', {
-              video: { url: videoLink.a },
-              caption: caption
-            })
-          }
-        }
-      } catch (error3) {
-        console.error('SaveTT method failed:', error3.message)
-      }
-
-      // Method 4: Using TikWM (Updated approach)
-      try {
-        const response4 = await axios.get(`https://www.tikwm.com/api/`, {
-          params: {
-            url: url,
-            hd: 1
-          },
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-          }
-        })
-
-        if (response4.data && response4.data.code === 0 && response4.data.data) {
-          const data = response4.data.data
-          const videoUrl = data.hdplay || data.play || data.wmplay
-          const title = data.title || 'TikTok Video'
-          const author = data.author?.nickname || 'Unknown'
+        if (response.data && response.data.success && response.data.data) {
+          const data = response.data.data
+          const videoUrl = data.play || data.download_url || data.video_url
+          const title = data.title || data.desc || 'TikTok Video'
+          const author = data.author?.nickname || data.author || 'Unknown'
 
           if (videoUrl) {
             const caption = `🎵 *TikTok Video*\n\n` +
@@ -143,23 +56,94 @@ bot(
                            `📝 **Title:** ${title}\n` +
                            `🔗 **Source:** TikTok`
 
-            await message.react('✅')
-            return await message.send('', {
+            await message.send('', {
               video: { url: videoUrl },
               caption: caption
             })
+            success = true
           }
         }
-      } catch (error4) {
-        console.error('TikWM method failed:', error4.message)
+      } catch (error1) {
+        console.error('Douyin Pro API failed:', error1.message)
       }
 
-      await message.react('❌')
-      return await message.reply('❌ Failed to download TikTok video. The video might be private or all services are temporarily unavailable.')
+      // Method 2: TiklyDown API
+      if (!success) {
+        try {
+          const response = await axios.post(APIs[1], {
+            url: url
+          }, {
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            },
+            timeout: 15000
+          })
+
+          if (response.data && response.data.success && response.data.video) {
+            const data = response.data
+            const videoUrl = data.video.noWatermark || data.video.watermark
+            const title = data.title || 'TikTok Video'
+            const author = data.author?.name || 'Unknown'
+
+            if (videoUrl) {
+              const caption = `🎵 *TikTok Video*\n\n` +
+                             `👤 **Author:** ${author}\n` +
+                             `📝 **Title:** ${title}\n` +
+                             `🔗 **Source:** TikTok`
+
+              await message.send('', {
+                video: { url: videoUrl },
+                caption: caption
+              })
+              success = true
+            }
+          }
+        } catch (error2) {
+          console.error('TiklyDown API failed:', error2.message)
+        }
+      }
+
+      // Method 3: TikWM API
+      if (!success) {
+        try {
+          const response = await axios.get(APIs[2] + encodeURIComponent(url), {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            },
+            timeout: 15000
+          })
+
+          if (response.data && response.data.code === 0 && response.data.data) {
+            const data = response.data.data
+            const videoUrl = data.hdplay || data.play || data.wmplay
+            const title = data.title || 'TikTok Video'
+            const author = data.author?.nickname || 'Unknown'
+
+            if (videoUrl) {
+              const caption = `🎵 *TikTok Video*\n\n` +
+                             `👤 **Author:** ${author}\n` +
+                             `📝 **Title:** ${title}\n` +
+                             `🔗 **Source:** TikTok`
+
+              await message.send('', {
+                video: { url: videoUrl },
+                caption: caption
+              })
+              success = true
+            }
+          }
+        } catch (error3) {
+          console.error('TikWM API failed:', error3.message)
+        }
+      }
+
+      if (!success) {
+        return await message.reply('❌ Failed to download TikTok video. All services are temporarily unavailable or the video might be private.')
+      }
 
     } catch (error) {
       console.error('TikTok download error:', error)
-      await message.react('❌')
       return await message.reply('❌ Failed to download TikTok video. Please try again later.')
     }
   }
