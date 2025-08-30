@@ -86,7 +86,7 @@ async function downloadWithTikTokApiDl(url, messageId) {
   })
 
   if (result?.status === 'success' && result?.result?.video) {
-    const videoUrl = result.result.video
+    const videoUrl = Array.isArray(result.result.video) ? result.result.video[0] : result.result.video
     return await downloadFromDirectUrl(videoUrl, messageId, 'tiktok_api_')
   }
   throw new Error('No video URL from tiktok-api-dl')
