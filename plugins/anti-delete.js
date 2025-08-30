@@ -242,22 +242,25 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
       })
     }
     
-    // Send media if available with quoted context
+    // Send media if available with quoted context and empty quote
     if (trackedMessage.mediaData && trackedMessage.mediaData.buffer) {
       const mediaData = trackedMessage.mediaData
       let mediaMessage = {}
       
-      // Create contextInfo for media to show it was deleted
+      // Create contextInfo for media with empty quoted message
       const contextInfo = {
         stanzaId: trackedMessage.id,
-        participant: trackedMessage.senderJid
+        participant: trackedMessage.senderJid,
+        quotedMessage: {
+          conversation: ""  // Empty quoted message for media too
+        }
       }
       
       switch (mediaData.type) {
         case 'image':
           mediaMessage = {
             image: mediaData.buffer,
-            caption: `🗑️ _This image was deleted_`,
+            caption: trackedMessage.text || "", // Use original caption if any, otherwise empty
             mimetype: mediaData.mimetype,
             contextInfo: contextInfo
           }
@@ -265,7 +268,7 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
         case 'video':
           mediaMessage = {
             video: mediaData.buffer,
-            caption: `🗑️ _This video was deleted_`,
+            caption: trackedMessage.text || "", // Use original caption if any, otherwise empty
             mimetype: mediaData.mimetype,
             contextInfo: contextInfo
           }
@@ -282,7 +285,7 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
           mediaMessage = {
             document: mediaData.buffer,
             mimetype: mediaData.mimetype,
-            fileName: mediaData.filename || 'deleted_file',
+            fileName: mediaData.filename || 'file',
             contextInfo: contextInfo
           }
           break
