@@ -107,7 +107,7 @@ bot(
 
     if (args === 'now') {
       try {
-        await message.reply('🔄 *Updating Bot...*\n\nRecloning from repository and restarting...')
+        await message.reply('🔄 *Updating Bot...*')
         
         // Give time for the message to be sent
         setTimeout(() => {
