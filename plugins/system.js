@@ -13,13 +13,19 @@ bot(
       return await message.reply('❌ Only owner can shutdown the bot')
     }
     
-    await message.reply('🛑 *Bot Shutting Down...*\n\nGoodbye! 👋')
+    try {
+      // Send shutdown notification
+      const utils = require('../lib/utils')
+      await utils.sendOwnerNotification(message.client.socket, message.client.ownerJid, 'shutdown')
+    } catch (error) {
+      console.error('Failed to send shutdown notification:', error)
+    }
     
-    // Give time for the message to be sent
+    // Give time for the notification to be sent
     setTimeout(() => {
       console.log('🛑 Bot shutdown requested by owner')
       process.exit(0)
-    }, 2000)
+    }, 3000) // Increased to 3 seconds to ensure notification is sent
   }
 )
 
@@ -35,7 +41,12 @@ bot(
       return await message.reply('❌ Only owner can restart the bot')
     }
     
-    await message.reply('🔄 *Bot Restarting...*\n\nI\'ll be back in a moment! ⚡')
+    try {
+      // Send restart notification (just a quick acknowledgment)
+      await message.reply('🔄 *Bot Restarting...*\n\nI\'ll be back in a moment! ⚡')
+    } catch (error) {
+      console.error('Failed to send restart acknowledgment:', error)
+    }
     
     // Give time for the message to be sent
     setTimeout(() => {
