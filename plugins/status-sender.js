@@ -4,9 +4,9 @@ const config = require('../config')
 const fs = require('fs-extra')
 const path = require('path')
 
-// No cache needed - we search media files directly
 // Deduplication tracker to prevent processing same message multiple times
 const processedMessages = new Set()
+const processedReplies = new Set()
 
 
 // Helper function to find media file by message ID (no cache needed)
@@ -240,13 +240,6 @@ async function handleStatusUpdate(client, message) {
     
     if (!isStatusUpdate) return
     
-    // Only log if it's from owner for now (we handle all via direct file search)
-    if (isFromOwner) {
-      // Status from owner
-    } else {
-      // Status from other user - also archived by media system
-    }
-    
     // Check if status contains media
     if (client.hasMedia(message.message)) {
       const userType = isFromOwner ? 'Owner' : 'User'
@@ -266,11 +259,17 @@ async function handleStatusReply(client, message) {
   try {
     // Deduplication check for reply processing
     const replyId = message.key.id
-    if (processedMessages.has(`reply_${replyId}`)) {
+    if (processedReplies.has(replyId)) {
       console.log(`⏭️ Skipping already processed reply: ${replyId}`)
       return
     }
-    processedMessages.add(`reply_${replyId}`)
+    processedReplies.add(replyId)
+    
+    // Clean up old reply entries (keep only last 50)
+    if (processedReplies.size > 50) {
+      const entries = Array.from(processedReplies)
+      entries.slice(0, 25).forEach(id => processedReplies.delete(id))
+    }
     
     const text = require('../lib/utils').getMessageText(message)
     if (!text) return
@@ -373,9 +372,9 @@ if (!global.statusSenderHookInstalled) {
         await handleStatusUpdate(this, message)
       }
       
-      // Handle potential status replies
+      // Handle potential status replies (but not command messages that start with .)
       const text = require('../lib/utils').getMessageText(message)
-      if (text && message.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
+      if (text && message.message?.extendedTextMessage?.contextInfo?.quotedMessage && !text.startsWith('.')) {
         await handleStatusReply(this, message)
       }
       
