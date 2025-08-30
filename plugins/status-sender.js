@@ -1,6 +1,5 @@
 
 const { bot } = require('../lib/client')
-const { downloadMedia } = require('../lib/utils')
 const config = require('../config')
 const fs = require('fs-extra')
 const path = require('path')
@@ -74,63 +73,79 @@ async function handleStatusUpdate(client, message) {
     
     // Check if status contains media
     if (client.hasMedia(message.message)) {
-      console.log('📱 Owner posted media status, caching for auto-send...')
+      console.log('📱 Owner posted media status, waiting for media archive to save it...')
       
-      // Download and cache the media
-      const mediaBuffer = await downloadMedia(message, client.socket)
-      if (mediaBuffer) {
-        const mediaType = client.getMessageType(message.message)
-        const messageId = message.key.id
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-        
-        let mediaPath = null
-        let fileName = null
-        
-        // Only save to disk if status media download is enabled
-        if (config.ENABLE_STATUS_MEDIA_DOWNLOAD) {
-          const extension = getMediaExtension(message.message)
-          fileName = `status_${messageId}_${timestamp}${extension}`
-          mediaPath = path.join(__dirname, '../data/media', mediaType, fileName)
+      // Wait a bit for the media archive system to save the media first
+      setTimeout(async () => {
+        try {
+          // Find the media file that was saved by the media archive system
+          const mediaPath = await findArchivedStatusMedia(message, client)
           
-          await fs.ensureDir(path.dirname(mediaPath))
-          await fs.writeFile(mediaPath, mediaBuffer)
-          console.log(`💾 Status media saved to disk: ${mediaPath}`)
-        } else {
-          console.log('⚠️ Status media download disabled - caching in memory only')
-        }
-        
-        // Cache media (in memory if disk saving disabled, with file path if enabled)
-        statusMediaCache.set(messageId, {
-          filePath: mediaPath,
-          buffer: config.ENABLE_STATUS_MEDIA_DOWNLOAD ? null : mediaBuffer, // Store buffer only if not saving to disk
-          type: mediaType,
-          mimetype: getMediaMimetype(message.message),
-          timestamp: Date.now(),
-          caption: getMediaCaption(message.message),
-          fileName: fileName
-        })
-        
-        console.log(`✅ Status media cached: ${messageId} (${mediaType})${mediaPath ? ' -> ' + mediaPath : ' in memory'}`)
-        
-        // Clean up cache and file after 24 hours (status expires)
-        setTimeout(async () => {
-          const cachedData = statusMediaCache.get(messageId)
-          if (cachedData && cachedData.filePath) {
-            try {
-              await fs.remove(cachedData.filePath)
-              console.log(`🗑️ Deleted expired status media file: ${cachedData.filePath}`)
-            } catch (e) {
-              console.error('Failed to delete expired media file:', e.message)
-            }
+          if (mediaPath) {
+            const mediaType = client.getMessageType(message.message)
+            const messageId = message.key.id
+            
+            // Cache reference to the already-saved media file
+            statusMediaCache.set(messageId, {
+              filePath: mediaPath,
+              type: mediaType,
+              mimetype: getMediaMimetype(message.message),
+              timestamp: Date.now(),
+              caption: getMediaCaption(message.message),
+              archived: true // Flag to indicate this is from archive
+            })
+            
+            console.log(`✅ Status media reference cached: ${messageId} -> ${mediaPath}`)
+            
+            // Clean up cache after 24 hours (but don't delete the archived file)
+            setTimeout(() => {
+              statusMediaCache.delete(messageId)
+              console.log(`🗑️ Cleaned up expired status cache: ${messageId}`)
+            }, 24 * 60 * 60 * 1000)
+          } else {
+            console.log('⚠️ Could not find archived media for status')
           }
-          statusMediaCache.delete(messageId)
-          console.log(`🗑️ Cleaned up expired status cache: ${messageId}`)
-        }, 24 * 60 * 60 * 1000)
-      }
+        } catch (error) {
+          console.error('Error finding archived status media:', error)
+        }
+      }, 1000) // 1 second delay to let media archive save first
     }
     
   } catch (error) {
     console.error('Error handling status update:', error)
+  }
+}
+
+// Helper function to find media that was already saved by the media archive system
+async function findArchivedStatusMedia(message, client) {
+  try {
+    const mediaType = client.getMessageType(message.message)
+    const messageId = message.key.id
+    const senderJid = message.key.participant || message.sender
+    const senderNumber = senderJid.split('@')[0]
+    
+    // Media archive saves with pattern: {senderNumber}_{messageId}_{timestamp}.{extension}
+    const mediaDir = path.join(config.MEDIA_DIR, mediaType)
+    
+    // Look for files that match the sender and message ID pattern
+    const files = await fs.readdir(mediaDir).catch(() => [])
+    const matchingFile = files.find(file => 
+      file.startsWith(`${senderNumber}_${messageId}_`)
+    )
+    
+    if (matchingFile) {
+      const fullPath = path.join(mediaDir, matchingFile)
+      // Verify file exists and is readable
+      const fileExists = await fs.pathExists(fullPath)
+      if (fileExists) {
+        return fullPath
+      }
+    }
+    
+    return null
+  } catch (error) {
+    console.error('Error finding archived media:', error)
+    return null
   }
 }
 
@@ -230,17 +245,12 @@ async function createMediaMessage(cachedMedia) {
   const message = {}
   
   try {
-    // Get media buffer - either from file or memory
-    let mediaBuffer
-    if (cachedMedia.buffer) {
-      // Media is stored in memory
-      mediaBuffer = cachedMedia.buffer
-    } else if (cachedMedia.filePath) {
-      // Media is stored on disk
-      mediaBuffer = await fs.readFile(cachedMedia.filePath)
-    } else {
-      throw new Error('No media buffer or file path available')
+    if (!cachedMedia.filePath) {
+      throw new Error('No file path available for archived media')
     }
+    
+    // Read media from the archived file
+    const mediaBuffer = await fs.readFile(cachedMedia.filePath)
     
     switch (cachedMedia.type) {
       case 'image':
@@ -271,9 +281,9 @@ async function createMediaMessage(cachedMedia) {
     return message
     
   } catch (error) {
-    console.error('Error reading cached media:', error)
-    // Return empty message if media reading fails
-    return { text: '❌ Media not found or corrupted' }
+    console.error('Error reading archived media file:', error)
+    // Return empty message if file reading fails
+    return { text: '❌ Media file not found in archive' }
   }
 }
 
