@@ -1,4 +1,3 @@
-
 const { bot } = require('../lib/client')
 const fs = require('fs-extra')
 const path = require('path')
@@ -45,28 +44,34 @@ async function saveAntiDeleteConfig() {
 // Track new messages
 async function trackMessage(message, messageText, socket) {
   if (!antiDeleteConfig.enabled) return
-  
+
   const messageId = message.key.id
   const senderJid = message.key.participant || message.key.remoteJid
   const chatJid = message.key.remoteJid
   const isFromOwner = message.key.fromMe
   const isGroup = chatJid.endsWith('@g.us')
-  
+  const isStatus = chatJid.endsWith('@broadcast')
+
   // Skip if ignoring owner messages and this is from owner
   if (antiDeleteConfig.ignoreOwner && isFromOwner) {
     return
   }
 
   // Only track messages in groups or from non-owners (where deletion detection matters)
-  if (!isGroup && isFromOwner) {
+  if (!isGroup && isFromOwner && !isStatus) {
     return // Don't track owner's personal messages
   }
-  
+
+  // Skip status messages from being tracked
+  if (isStatus) {
+    return
+  }
+
   // Only log tracking for debugging, not every message
   if (process.env.DEBUG_ANTI_DELETE === 'true') {
     console.log(`📝 Tracking message: ${messageId} from ${senderJid} in ${chatJid}`)
   }
-  
+
   // Check if message has media and download it
   let mediaData = null
   if (hasMedia(message.message) && socket) {
@@ -85,7 +90,7 @@ async function trackMessage(message, messageText, socket) {
       console.error('Failed to download media for tracking:', error)
     }
   }
-  
+
   // Store message data
   messageTracker.set(messageId, {
     id: messageId,
@@ -98,7 +103,7 @@ async function trackMessage(message, messageText, socket) {
     originalMessage: message,
     mediaData: mediaData
   })
-  
+
   // Clean up old messages
   setTimeout(() => {
     messageTracker.delete(messageId)
@@ -144,15 +149,21 @@ function getMediaFilename(messageContent) {
 // Handle message deletion detection
 async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
   console.log(`🗑️ Deletion handler called for: ${deletedMessageId} in ${chatJid}`)
-  
+
   if (!antiDeleteConfig.enabled) {
     console.log(`❌ Anti-delete disabled, skipping`)
     return
   }
-  
+
+  // Check if the chat is a status broadcast, if so, ignore
+  if (chatJid.endsWith('@broadcast')) {
+    console.log(`⏭️ Skipping deletion from status broadcast: ${deletedMessageId}`)
+    return
+  }
+
   // Create a unique key for this deletion event to prevent duplicates
   const deletionKey = `${deletedMessageId}_${normalizeJid(chatJid)}`
-  
+
   // Check if we've already processed this deletion recently (within 5 seconds)
   const now = Date.now()
   const lastProcessed = deletionCache.get(deletionKey)
@@ -160,51 +171,51 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
     console.log(`⏭️ Duplicate deletion event ignored: ${deletedMessageId}`)
     return
   }
-  
+
   // Store this deletion event
   deletionCache.set(deletionKey, now)
-  
+
   // Clean up old deletion cache entries (older than 1 minute)
   for (const [key, timestamp] of deletionCache.entries()) {
     if (now - timestamp > 60000) {
       deletionCache.delete(key)
     }
   }
-  
+
   // Check if message exists first to determine sender
   let trackedMessage = messageTracker.get(deletedMessageId)
-  
+
   // If not found in memory, search in archived messages for sender info
   if (!trackedMessage) {
     console.log(`🔍 Message not in memory tracker, searching in archived messages...`)
     trackedMessage = await searchArchivedMessage(deletedMessageId, chatJid)
   }
-  
+
   // If ignoring owner messages, check if the ORIGINAL SENDER was the owner
   if (antiDeleteConfig.ignoreOwner && socket.user && trackedMessage) {
     const ownerJid = socket.user.id
     const normalizedOwnerJid = normalizeJid(ownerJid)
     const normalizedSenderJid = normalizeJid(trackedMessage.senderJid)
-    
+
     // Skip only if the SENDER was the owner (not just if it's in owner's chat)
     if (normalizedSenderJid === normalizedOwnerJid || trackedMessage.isFromOwner) {
       console.log(`⏭️ Skipping owner's own message deletion: ${deletedMessageId}`)
       return
     }
   }
-  
+
   if (!trackedMessage) {
     console.log(`❌ Message not found in tracker or archives: ${deletedMessageId}`)
     console.log(`📊 Currently tracking ${messageTracker.size} messages`)
     return
   }
-  
+
   console.log(`✅ Found deleted message in tracker: ${deletedMessageId}`)
-  
+
   try {
     // Determine where to send the deleted message
     let targetJid = antiDeleteConfig.customJid
-    
+
     if (!targetJid && antiDeleteConfig.sendToPersonal) {
       // Send to owner's personal chat (bot owner's own number)
       if (socket.user && socket.user.id) {
@@ -214,12 +225,12 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
         targetJid = chatJid
       }
     }
-    
+
     if (!targetJid) return
-    
+
     // Get sender name (remove @s.whatsapp.net and any numbers after ':')
     const senderName = trackedMessage.senderJid.split('@')[0].split(':')[0]
-    
+
     // Create quoted message structure to make it look like a reply/tag
     if (trackedMessage.text) {
       // Send the deleted message content as the new message, with empty quote
@@ -233,25 +244,25 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
           }
         }
       }
-      
+
       await socket.sendMessage(targetJid, quotedMessage)
     }
     // For media-only messages, don't send any text notification - just the media below
-    
+
     // Send media if available with quoted context and empty quote
     if (trackedMessage.mediaData && trackedMessage.mediaData.buffer) {
       const mediaData = trackedMessage.mediaData
       let mediaMessage = {}
-      
+
       // Create contextInfo for media with empty quoted message
       const contextInfo = {
         stanzaId: trackedMessage.id,
         participant: trackedMessage.senderJid,
         quotedMessage: {
-          conversation: ""  // Empty quoted message for media too
+          conversation: ""  // Empty quoted message
         }
       }
-      
+
       switch (mediaData.type) {
         case 'image':
           mediaMessage = {
@@ -292,15 +303,15 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
           }
           break
       }
-      
+
       if (Object.keys(mediaMessage).length > 0) {
         await socket.sendMessage(targetJid, mediaMessage)
         console.log(`🗑️ Deleted media (${mediaData.type}) recovered and sent`)
       }
     }
-    
+
     console.log(`🗑️ Deleted message recovered and sent to ${targetJid}`)
-    
+
   } catch (error) {
     console.error('Error handling deleted message:', error)
   }
@@ -311,16 +322,16 @@ async function searchArchivedMessage(messageId, chatJid) {
   try {
     const isGroup = chatJid.endsWith('@g.us')
     const category = isGroup ? 'groups' : 'individual'
-    
+
     // Search in the last 3 days
     for (let dayOffset = 0; dayOffset < 3; dayOffset++) {
       const searchDate = new Date()
       searchDate.setDate(searchDate.getDate() - dayOffset)
-      
+
       const year = searchDate.getFullYear()
       const month = String(searchDate.getMonth() + 1).padStart(2, '0')
       const day = String(searchDate.getDate()).padStart(2, '0')
-      
+
       const archivePath = path.join(
         __dirname, '../data/messages',
         year.toString(),
@@ -328,14 +339,14 @@ async function searchArchivedMessage(messageId, chatJid) {
         category,
         `${day}.json`
       )
-      
+
       if (await fs.pathExists(archivePath)) {
         const messages = await fs.readJson(archivePath)
         const foundMessage = messages.find(msg => msg.id === messageId)
-        
+
         if (foundMessage) {
           console.log(`✅ Found deleted message in archives: ${messageId}`)
-          
+
           // Convert archived message to tracker format
           return {
             id: foundMessage.id,
@@ -351,7 +362,7 @@ async function searchArchivedMessage(messageId, chatJid) {
         }
       }
     }
-    
+
     return null
   } catch (error) {
     console.error('Error searching archived messages:', error)
@@ -363,13 +374,13 @@ async function searchArchivedMessage(messageId, chatJid) {
 async function loadArchivedMedia(mediaPath) {
   try {
     if (!mediaPath || !await fs.pathExists(mediaPath)) return null
-    
+
     const buffer = await fs.readFile(mediaPath)
     const extension = path.extname(mediaPath).toLowerCase()
-    
+
     let type = 'document'
     let mimetype = 'application/octet-stream'
-    
+
     if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(extension)) {
       type = 'image'
       mimetype = `image/${extension.slice(1)}`
@@ -380,7 +391,7 @@ async function loadArchivedMedia(mediaPath) {
       type = 'audio'
       mimetype = `audio/${extension.slice(1)}`
     }
-    
+
     return {
       buffer,
       type,
@@ -411,16 +422,16 @@ bot(
     if (!message.key.fromMe && message.sender !== message.client.ownerJid) {
       return await message.reply('❌ Only owner can configure anti-delete settings')
     }
-    
+
     const param = match.trim().toLowerCase()
-    
+
     if (!param) {
       // Show current status
       const status = antiDeleteConfig.enabled ? '🟢 ON' : '🔴 OFF'
       const target = antiDeleteConfig.customJid 
         ? antiDeleteConfig.customJid
         : 'User Personal Chat'
-      
+
       return await message.reply(
         `🛡️ *Anti-Delete Status*\n\n` +
         `Status: ${status}\n` +
@@ -431,19 +442,19 @@ bot(
         `• \`.delete <jid>\` - Set custom JID`
       )
     }
-    
+
     if (param === 'on') {
       antiDeleteConfig.enabled = true
       await saveAntiDeleteConfig()
       return await message.reply('✅ Anti-delete enabled')
     }
-    
+
     if (param === 'off') {
       antiDeleteConfig.enabled = false
       await saveAntiDeleteConfig()
       return await message.reply('❌ Anti-delete disabled')
     }
-    
+
     // If it's not 'on' or 'off', treat it as JID
     if (param.includes('@')) {
       antiDeleteConfig.customJid = param
@@ -459,7 +470,7 @@ bot(
 // Helper function to normalize JID for comparison
 function normalizeJid(jid) {
   if (!jid) return ''
-  
+
   // Remove any suffix numbers that WhatsApp sometimes adds
   // Convert 2347046040727:26@s.whatsapp.net to 2347046040727@s.whatsapp.net
   return jid.replace(/:\d+@/, '@')
