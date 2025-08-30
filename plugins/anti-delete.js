@@ -52,7 +52,7 @@ async function trackMessage(message, messageText, socket) {
   
   // Skip if ignoring owner messages and this is from owner
   if (antiDeleteConfig.ignoreOwner && isFromOwner) {
-    console.log(`⏭️ Skipping owner message: ${messageId}`)
+    console.log(`⏭️ Skipping owner message tracking in memory: ${messageId}`)
     return
   }
   
@@ -139,9 +139,17 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
     return
   }
   
-  const trackedMessage = messageTracker.get(deletedMessageId)
+  // First check in-memory tracker
+  let trackedMessage = messageTracker.get(deletedMessageId)
+  
+  // If not found in memory, search in archived messages
   if (!trackedMessage) {
-    console.log(`❌ Message not found in tracker: ${deletedMessageId}`)
+    console.log(`🔍 Message not in memory tracker, searching in archived messages...`)
+    trackedMessage = await searchArchivedMessage(deletedMessageId, chatJid)
+  }
+  
+  if (!trackedMessage) {
+    console.log(`❌ Message not found in tracker or archives: ${deletedMessageId}`)
     console.log(`📊 Currently tracking ${messageTracker.size} messages`)
     return
   }
@@ -235,6 +243,93 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
     
   } catch (error) {
     console.error('Error handling deleted message:', error)
+  }
+}
+
+// Search for message in archived data
+async function searchArchivedMessage(messageId, chatJid) {
+  try {
+    const isGroup = chatJid.endsWith('@g.us')
+    const category = isGroup ? 'groups' : 'individual'
+    
+    // Search in the last 3 days
+    for (let dayOffset = 0; dayOffset < 3; dayOffset++) {
+      const searchDate = new Date()
+      searchDate.setDate(searchDate.getDate() - dayOffset)
+      
+      const year = searchDate.getFullYear()
+      const month = String(searchDate.getMonth() + 1).padStart(2, '0')
+      const day = String(searchDate.getDate()).padStart(2, '0')
+      
+      const archivePath = path.join(
+        __dirname, '../data/messages',
+        year.toString(),
+        month,
+        category,
+        `${day}.json`
+      )
+      
+      if (await fs.pathExists(archivePath)) {
+        const messages = await fs.readJson(archivePath)
+        const foundMessage = messages.find(msg => msg.id === messageId)
+        
+        if (foundMessage) {
+          console.log(`✅ Found deleted message in archives: ${messageId}`)
+          
+          // Convert archived message to tracker format
+          return {
+            id: foundMessage.id,
+            senderJid: foundMessage.from,
+            chatJid: foundMessage.to,
+            text: foundMessage.body,
+            timestamp: new Date(foundMessage.timestamp).getTime(),
+            isFromOwner: foundMessage.isOutgoing,
+            isGroup: foundMessage.isGroup,
+            originalMessage: null,
+            mediaData: foundMessage.mediaPath ? await loadArchivedMedia(foundMessage.mediaPath) : null
+          }
+        }
+      }
+    }
+    
+    return null
+  } catch (error) {
+    console.error('Error searching archived messages:', error)
+    return null
+  }
+}
+
+// Load archived media if available
+async function loadArchivedMedia(mediaPath) {
+  try {
+    if (!mediaPath || !await fs.pathExists(mediaPath)) return null
+    
+    const buffer = await fs.readFile(mediaPath)
+    const extension = path.extname(mediaPath).toLowerCase()
+    
+    let type = 'document'
+    let mimetype = 'application/octet-stream'
+    
+    if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(extension)) {
+      type = 'image'
+      mimetype = `image/${extension.slice(1)}`
+    } else if (['.mp4', '.avi', '.mov', '.webm'].includes(extension)) {
+      type = 'video'
+      mimetype = `video/${extension.slice(1)}`
+    } else if (['.mp3', '.wav', '.ogg', '.m4a'].includes(extension)) {
+      type = 'audio'
+      mimetype = `audio/${extension.slice(1)}`
+    }
+    
+    return {
+      buffer,
+      type,
+      mimetype,
+      filename: path.basename(mediaPath)
+    }
+  } catch (error) {
+    console.error('Error loading archived media:', error)
+    return null
   }
 }
 
