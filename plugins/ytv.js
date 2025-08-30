@@ -20,10 +20,11 @@ bot(
       return await message.reply('❌ Invalid YouTube URL')
     }
 
+    let tempFile
     try {
       await message.reply('⬇️ *Downloading video...*\n\nPlease wait, this may take a moment.')
       
-      const tempFile = await downloadVideo(url, message.key.id)
+      tempFile = await downloadVideo(url, message.key.id)
       if (!tempFile) {
         return await message.reply('❌ *Download failed*\n\nAll download methods failed. The video might be private, age-restricted, or unavailable.')
       }
@@ -38,28 +39,24 @@ bot(
       }
       
       await message.reply(`📹 *Sending video...*\n\nSize: ${fileSizeMB.toFixed(2)}MB`)
-    } catch (error) {
-      console.error('Download error:', error)
-      return await message.reply('❌ *Download error*\n\nUnexpected error occurred during download.')
-    }
 
-    try {
       // Send video
       await message.client.socket.sendMessage(message.key.remoteJid, {
         video: fs.readFileSync(tempFile),
-
       })
 
       // console.log('✅ Video sent successfully')
     } catch (error) {
-      console.error('❌ Error sending video:', error)
-      await message.reply('❌ Failed to send video')
+      console.error('❌ Error:', error)
+      await message.reply('❌ Failed to download or send video')
     } finally {
       // Always delete temp file
-      try {
-        fs.unlinkSync(tempFile)
-        // console.log(`🗑️ Cleaned up: ${tempFile}`)
-      } catch (e) {}
+      if (tempFile) {
+        try {
+          fs.unlinkSync(tempFile)
+          // console.log(`🗑️ Cleaned up: ${tempFile}`)
+        } catch (e) {}
+      }
     }
   }
 )
@@ -81,10 +78,11 @@ bot(
       return await message.reply('❌ Invalid YouTube URL')
     }
 
+    let tempFile
     try {
       await message.reply('⬇️ *Downloading video...*\n\nPlease wait, this may take a moment.')
       
-      const tempFile = await downloadVideo(url, message.key.id)
+      tempFile = await downloadVideo(url, message.key.id)
       if (!tempFile) {
         return await message.reply('❌ *Download failed*\n\nAll download methods failed. The video might be private, age-restricted, or unavailable.')
       }
@@ -99,28 +97,24 @@ bot(
       }
       
       await message.reply(`📹 *Sending video...*\n\nSize: ${fileSizeMB.toFixed(2)}MB`)
-    } catch (error) {
-      console.error('Download error:', error)
-      return await message.reply('❌ *Download error*\n\nUnexpected error occurred during download.')
-    }
 
-    try {
       // Send video
       await message.client.socket.sendMessage(message.key.remoteJid, {
         video: fs.readFileSync(tempFile),
-
       })
 
       // console.log('✅ Video sent successfully')
     } catch (error) {
-      console.error('❌ Error sending video:', error)
-      await message.reply('❌ Failed to send video')
+      console.error('❌ Error:', error)
+      await message.reply('❌ Failed to download or send video')
     } finally {
       // Always delete temp file
-      try {
-        fs.unlinkSync(tempFile)
-        // console.log(`🗑️ Cleaned up: ${tempFile}`)
-      } catch (e) {}
+      if (tempFile) {
+        try {
+          fs.unlinkSync(tempFile)
+          // console.log(`🗑️ Cleaned up: ${tempFile}`)
+        } catch (e) {}
+      }
     }
   }
 )

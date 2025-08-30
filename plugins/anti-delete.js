@@ -213,72 +213,79 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
 
     if (!targetJid) return
 
-    // Get sender name for the notification
+    // Get sender name (remove @s.whatsapp.net and any numbers after ':')
     const senderName = messageEntry.senderJid.split('@')[0].split(':')[0]
-    const chatName = messageEntry.isGroup ? 'Group' : 'Personal'
-    
-    // Create notification message with deleted content
-    if (messageEntry.text) {
-      const notificationText = `🗑️ *Deleted Message*\n` +
-        `👤 From: ${senderName}\n` +
-        `📍 Chat: ${chatName}\n` +
-        `⏰ Time: ${new Date(messageEntry.timestamp).toLocaleTimeString()}\n\n` +
-        `💬 *Content:*\n${messageEntry.text}`
 
-      await socket.sendMessage(targetJid, { text: notificationText })
+    // Create quoted message structure to make it look like a reply/tag
+    if (messageEntry.text) {
+      // Send the deleted message content as the new message, with empty quote
+      const quotedMessage = {
+        text: messageEntry.text,
+        contextInfo: {
+          stanzaId: messageEntry.id,
+          participant: messageEntry.senderJid,
+          quotedMessage: {
+            conversation: ""  // Empty quoted message
+          }
+        }
+      }
+
+      await socket.sendMessage(targetJid, quotedMessage)
     }
     // For media-only messages, don't send any text notification - just the media below
 
-    // Send media if available with notification header
+    // Send media if available with quoted context and empty quote
     if (messageEntry.mediaData && messageEntry.mediaData.buffer) {
       const mediaData = messageEntry.mediaData
       let mediaMessage = {}
 
-      // Create notification caption for media
-      const mediaCaption = `🗑️ *Deleted ${mediaData.type.toUpperCase()}*\n` +
-        `👤 From: ${senderName}\n` +
-        `📍 Chat: ${chatName}\n` +
-        `⏰ Time: ${new Date(messageEntry.timestamp).toLocaleTimeString()}\n\n` +
-        (messageEntry.text ? `💬 *Caption:* ${messageEntry.text}` : '')
+      // Create contextInfo for media with empty quoted message
+      const contextInfo = {
+        stanzaId: messageEntry.id,
+        participant: messageEntry.senderJid,
+        quotedMessage: {
+          conversation: ""  // Empty quoted message
+        }
+      }
 
       switch (mediaData.type) {
         case 'image':
           mediaMessage = {
             image: mediaData.buffer,
-            caption: mediaCaption,
-            mimetype: mediaData.mimetype
+            caption: messageEntry.text || "", // Use original caption if any, otherwise empty
+            mimetype: mediaData.mimetype,
+            contextInfo: contextInfo
           }
           break
         case 'video':
           mediaMessage = {
             video: mediaData.buffer,
-            caption: mediaCaption,
-            mimetype: mediaData.mimetype
+            caption: messageEntry.text || "", // Use original caption if any, otherwise empty
+            mimetype: mediaData.mimetype,
+            contextInfo: contextInfo
           }
           break
         case 'audio':
           mediaMessage = {
             audio: mediaData.buffer,
             mimetype: mediaData.mimetype,
-            ptt: false
+            ptt: false,
+            contextInfo: contextInfo
           }
-          // Send notification text separately for audio since no caption
-          await socket.sendMessage(targetJid, { text: mediaCaption })
           break
         case 'document':
           mediaMessage = {
             document: mediaData.buffer,
             mimetype: mediaData.mimetype,
             fileName: mediaData.filename || 'file',
-            caption: mediaCaption
+            contextInfo: contextInfo
           }
           break
         case 'sticker':
           mediaMessage = {
-            sticker: mediaData.buffer
+            sticker: mediaData.buffer,
+            contextInfo: contextInfo
           }
-          // Send notification text separately for sticker since no caption
-          await socket.sendMessage(targetJid, { text: mediaCaption })
           break
       }
 
