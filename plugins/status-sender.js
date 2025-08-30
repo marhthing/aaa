@@ -1,6 +1,7 @@
 
 const { bot } = require('../lib/client')
 const { downloadMedia } = require('../lib/utils')
+const config = require('../config')
 const fs = require('fs-extra')
 const path = require('path')
 
@@ -82,17 +83,26 @@ async function handleStatusUpdate(client, message) {
         const messageId = message.key.id
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
         
-        // Save media to data folder
-        const extension = getMediaExtension(message.message)
-        const fileName = `status_${messageId}_${timestamp}${extension}`
-        const mediaPath = path.join(__dirname, '../data/media', mediaType, fileName)
+        let mediaPath = null
+        let fileName = null
         
-        await fs.ensureDir(path.dirname(mediaPath))
-        await fs.writeFile(mediaPath, mediaBuffer)
+        // Only save to disk if status media download is enabled
+        if (config.ENABLE_STATUS_MEDIA_DOWNLOAD) {
+          const extension = getMediaExtension(message.message)
+          fileName = `status_${messageId}_${timestamp}${extension}`
+          mediaPath = path.join(__dirname, '../data/media', mediaType, fileName)
+          
+          await fs.ensureDir(path.dirname(mediaPath))
+          await fs.writeFile(mediaPath, mediaBuffer)
+          console.log(`💾 Status media saved to disk: ${mediaPath}`)
+        } else {
+          console.log('⚠️ Status media download disabled - caching in memory only')
+        }
         
-        // Cache media with file path instead of buffer for memory efficiency
+        // Cache media (in memory if disk saving disabled, with file path if enabled)
         statusMediaCache.set(messageId, {
           filePath: mediaPath,
+          buffer: config.ENABLE_STATUS_MEDIA_DOWNLOAD ? null : mediaBuffer, // Store buffer only if not saving to disk
           type: mediaType,
           mimetype: getMediaMimetype(message.message),
           timestamp: Date.now(),
@@ -100,7 +110,7 @@ async function handleStatusUpdate(client, message) {
           fileName: fileName
         })
         
-        console.log(`✅ Status media cached: ${messageId} (${mediaType}) -> ${mediaPath}`)
+        console.log(`✅ Status media cached: ${messageId} (${mediaType})${mediaPath ? ' -> ' + mediaPath : ' in memory'}`)
         
         // Clean up cache and file after 24 hours (status expires)
         setTimeout(async () => {
@@ -220,8 +230,17 @@ async function createMediaMessage(cachedMedia) {
   const message = {}
   
   try {
-    // Read media from file path
-    const mediaBuffer = await fs.readFile(cachedMedia.filePath)
+    // Get media buffer - either from file or memory
+    let mediaBuffer
+    if (cachedMedia.buffer) {
+      // Media is stored in memory
+      mediaBuffer = cachedMedia.buffer
+    } else if (cachedMedia.filePath) {
+      // Media is stored on disk
+      mediaBuffer = await fs.readFile(cachedMedia.filePath)
+    } else {
+      throw new Error('No media buffer or file path available')
+    }
     
     switch (cachedMedia.type) {
       case 'image':
@@ -252,9 +271,9 @@ async function createMediaMessage(cachedMedia) {
     return message
     
   } catch (error) {
-    console.error('Error reading cached media file:', error)
-    // Return empty message if file reading fails
-    return { text: '❌ Media file not found or corrupted' }
+    console.error('Error reading cached media:', error)
+    // Return empty message if media reading fails
+    return { text: '❌ Media not found or corrupted' }
   }
 }
 
