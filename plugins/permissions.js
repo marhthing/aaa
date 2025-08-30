@@ -16,56 +16,52 @@ bot(
     }
     
     // Only owner can grant permissions
-    if (!message.key.fromMe && message.sender !== message.client.ownerJid) {
+    if (!message.key.fromMe && !message.client.isOwnerJid(message.sender)) {
       return await message.reply('❌ Only owner can grant permissions')
     }
     
     let targetJid = null
     let commandToAllow = null
     
-    // Parse input to determine target and command
-    const parts = input.split(' ')
-    
-    if (parts.length === 1) {
-      // Case: .allow ping (allow current chat user)
-      commandToAllow = parts[0]
-      
-      // If it's a group chat, we need a specific user context
-      if (message.isGroup) {
-        return await message.reply('❌ In group chats, please tag a user or specify JID:\n• `.allow @user ping`\n• `.allow <jid> ping`')
-      } else {
-        // In private chat, allow the other participant
-        targetJid = message.jid
-      }
-    } else if (parts.length === 2) {
-      // Case: .allow <jid> ping or .allow @user ping
-      const firstPart = parts[0]
-      commandToAllow = parts[1]
-      
-      // Check if it's a JID format
-      if (firstPart.includes('@')) {
-        targetJid = firstPart
-      } else {
-        // Could be a mention or invalid format
-        return await message.reply('❌ Invalid format. Use:\n• `.allow ping` (in private chat)\n• `.allow @user ping` (tag user)\n• `.allow <jid> ping` (specify JID)')
-      }
-    } else {
-      return await message.reply('❌ Invalid format. Use:\n• `.allow ping` - Allow current chat user\n• `.allow @user ping` - Allow tagged user\n• `.allow <jid> ping` - Allow specific JID')
-    }
-    
-    // Check for mentioned users in the message
+    // Check for mentioned users first (when tagging someone)
     if (message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.length > 0) {
-      // If user tagged someone, use the first mentioned JID
+      // Tagged user case: .allow @user ping
       targetJid = message.message.extendedTextMessage.contextInfo.mentionedJid[0]
-      // Reparse command in case of format like ".allow @user ping"
-      const words = input.split(' ').filter(word => !word.startsWith('@'))
-      if (words.length > 0) {
-        commandToAllow = words[words.length - 1] // Take the last word as command
+      // Extract command from input (last word after removing @mentions)
+      const words = input.split(' ').filter(word => !word.startsWith('@') && word.trim())
+      commandToAllow = words[words.length - 1]
+    } else {
+      // No mentions - parse input normally
+      const parts = input.split(' ')
+      
+      if (parts.length === 1) {
+        // Case: .allow ping (allow current chat user)
+        commandToAllow = parts[0]
+        
+        if (message.isGroup) {
+          return await message.reply('❌ In group chats, please tag a user:\n• `.allow @user ping`')
+        } else {
+          // In private chat, target is the other participant
+          targetJid = message.key.remoteJid
+        }
+      } else if (parts.length === 2) {
+        // Case: .allow <jid> ping
+        const firstPart = parts[0]
+        commandToAllow = parts[1]
+        
+        // Check if it's a JID format
+        if (firstPart.includes('@')) {
+          targetJid = firstPart
+        } else {
+          return await message.reply('❌ Invalid format. Use:\n• `.allow ping` (in private chat)\n• `.allow @user ping` (tag user)\n• `.allow <jid> ping` (specify JID)')
+        }
+      } else {
+        return await message.reply('❌ Invalid format. Use:\n• `.allow ping` - Allow current chat user\n• `.allow @user ping` - Allow tagged user\n• `.allow <jid> ping` - Allow specific JID')
       }
     }
     
     if (!targetJid || !commandToAllow) {
-      return await message.reply('❌ Could not determine target user or command. Please use:\n• `.allow ping` (in private chat)\n• `.allow @user ping` (tag user)\n• `.allow <jid> ping` (specify JID)')
+      return await message.reply('❌ Could not determine target user or command')
     }
     
     // Validate command name
@@ -97,55 +93,52 @@ bot(
     }
     
     // Only owner can revoke permissions
-    if (!message.key.fromMe && message.sender !== message.client.ownerJid) {
+    if (!message.key.fromMe && !message.client.isOwnerJid(message.sender)) {
       return await message.reply('❌ Only owner can revoke permissions')
     }
     
     let targetJid = null
     let commandToDisallow = null
     
-    // Parse input to determine target and command
-    const parts = input.split(' ')
-    
-    if (parts.length === 1) {
-      // Case: .disallow ping (disallow current chat user)
-      commandToDisallow = parts[0]
-      
-      // If it's a group chat, we need a specific user context
-      if (message.isGroup) {
-        return await message.reply('❌ In group chats, please tag a user or specify JID:\n• `.disallow @user ping`\n• `.disallow <jid> ping`')
-      } else {
-        // In private chat, disallow the other participant
-        targetJid = message.jid
-      }
-    } else if (parts.length === 2) {
-      // Case: .disallow <jid> ping or .disallow @user ping
-      const firstPart = parts[0]
-      commandToDisallow = parts[1]
-      
-      // Check if it's a JID format
-      if (firstPart.includes('@')) {
-        targetJid = firstPart
-      } else {
-        return await message.reply('❌ Invalid format. Use:\n• `.disallow ping` (in private chat)\n• `.disallow @user ping` (tag user)\n• `.disallow <jid> ping` (specify JID)')
-      }
-    } else {
-      return await message.reply('❌ Invalid format. Use:\n• `.disallow ping` - Remove current chat user access\n• `.disallow @user ping` - Remove tagged user access\n• `.disallow <jid> ping` - Remove specific JID access')
-    }
-    
-    // Check for mentioned users in the message
+    // Check for mentioned users first (when tagging someone)
     if (message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.length > 0) {
-      // If user tagged someone, use the first mentioned JID
+      // Tagged user case: .disallow @user ping
       targetJid = message.message.extendedTextMessage.contextInfo.mentionedJid[0]
-      // Reparse command in case of format like ".disallow @user ping"
-      const words = input.split(' ').filter(word => !word.startsWith('@'))
-      if (words.length > 0) {
-        commandToDisallow = words[words.length - 1] // Take the last word as command
+      // Extract command from input (last word after removing @mentions)
+      const words = input.split(' ').filter(word => !word.startsWith('@') && word.trim())
+      commandToDisallow = words[words.length - 1]
+    } else {
+      // No mentions - parse input normally
+      const parts = input.split(' ')
+      
+      if (parts.length === 1) {
+        // Case: .disallow ping (disallow current chat user)
+        commandToDisallow = parts[0]
+        
+        if (message.isGroup) {
+          return await message.reply('❌ In group chats, please tag a user:\n• `.disallow @user ping`')
+        } else {
+          // In private chat, target is the other participant
+          targetJid = message.key.remoteJid
+        }
+      } else if (parts.length === 2) {
+        // Case: .disallow <jid> ping
+        const firstPart = parts[0]
+        commandToDisallow = parts[1]
+        
+        // Check if it's a JID format
+        if (firstPart.includes('@')) {
+          targetJid = firstPart
+        } else {
+          return await message.reply('❌ Invalid format. Use:\n• `.disallow ping` (in private chat)\n• `.disallow @user ping` (tag user)\n• `.disallow <jid> ping` (specify JID)')
+        }
+      } else {
+        return await message.reply('❌ Invalid format. Use:\n• `.disallow ping` - Remove current chat user access\n• `.disallow @user ping` - Remove tagged user access\n• `.disallow <jid> ping` - Remove specific JID access')
       }
     }
     
     if (!targetJid || !commandToDisallow) {
-      return await message.reply('❌ Could not determine target user or command. Please use:\n• `.disallow ping` (in private chat)\n• `.disallow @user ping` (tag user)\n• `.disallow <jid> ping` (specify JID)')
+      return await message.reply('❌ Could not determine target user or command')
     }
     
     // Revoke permission
@@ -160,14 +153,74 @@ bot(
 
 bot(
   {
+    pattern: 'pm ?(.*)',
+    desc: 'Show permissions for current user in private chat',
+    type: 'misc',
+  },
+  async (message, match) => {
+    // Only works in private chats
+    if (message.isGroup) {
+      return await message.reply('❌ Use `.pim @user` in group chats to check user permissions')
+    }
+    
+    const targetJid = message.key.remoteJid
+    const allowedCommands = message.client.allowedUsers.get(targetJid) || []
+    
+    const displayName = targetJid.includes('@') ? targetJid.split('@')[0] : targetJid
+    
+    if (allowedCommands.length === 0) {
+      return await message.reply(`📋 **Permissions for ${displayName}:**\n\n❌ No special permissions granted\n\n💡 Contact owner to request command access`)
+    }
+    
+    let permissionsList = `📋 **Permissions for ${displayName}:**\n\n`
+    permissionsList += `✅ **Allowed Commands:**\n• .${allowedCommands.join('\n• .')}\n\n`
+    permissionsList += `💡 Total: ${allowedCommands.length} command(s)`
+    
+    return await message.reply(permissionsList)
+  }
+)
+
+bot(
+  {
+    pattern: 'pim ?(.*)',
+    desc: 'Show permissions for tagged user in group chat',
+    type: 'misc',
+  },
+  async (message, match) => {
+    let targetJid = null
+    
+    // Check for mentioned users
+    if (message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.length > 0) {
+      targetJid = message.message.extendedTextMessage.contextInfo.mentionedJid[0]
+    } else {
+      return await message.reply('❌ Please tag a user to check their permissions:\n• `.pim @user`')
+    }
+    
+    const allowedCommands = message.client.allowedUsers.get(targetJid) || []
+    const displayName = targetJid.includes('@') ? targetJid.split('@')[0] : targetJid
+    
+    if (allowedCommands.length === 0) {
+      return await message.reply(`📋 **Permissions for ${displayName}:**\n\n❌ No special permissions granted\n\n💡 Owner can use \`.allow @${displayName} <command>\` to grant access`)
+    }
+    
+    let permissionsList = `📋 **Permissions for ${displayName}:**\n\n`
+    permissionsList += `✅ **Allowed Commands:**\n• .${allowedCommands.join('\n• .')}\n\n`
+    permissionsList += `💡 Total: ${allowedCommands.length} command(s)`
+    
+    return await message.reply(permissionsList)
+  }
+)
+
+bot(
+  {
     pattern: 'permissions ?(.*)',
-    desc: 'List allowed users and their permissions',
+    desc: 'List all allowed users and their permissions (owner only)',
     type: 'owner',
   },
   async (message, match) => {
-    // Only owner can view permissions
-    if (!message.key.fromMe && message.sender !== message.client.ownerJid) {
-      return await message.reply('❌ Only owner can view permissions')
+    // Only owner can view all permissions
+    if (!message.key.fromMe && !message.client.isOwnerJid(message.sender)) {
+      return await message.reply('❌ Only owner can view all permissions')
     }
     
     const allowedUsers = message.client.allowedUsers
@@ -176,7 +229,7 @@ bot(
       return await message.reply('📋 No users have been granted specific permissions\n\n💡 **Usage Examples:**\n• `.allow ping` - Allow current chat user\n• `.allow @user ping` - Allow tagged user\n• `.allow <jid> ping` - Allow specific JID')
     }
     
-    let permissionsList = '📋 **Current Permissions:**\n\n'
+    let permissionsList = '📋 **All User Permissions:**\n\n'
     
     for (const [jid, commands] of allowedUsers.entries()) {
       const displayName = jid.includes('@') ? jid.split('@')[0] : jid
