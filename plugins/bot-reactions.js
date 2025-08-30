@@ -57,7 +57,7 @@ bot(
     
     if (!param) {
       // Show current status
-      const status = botReactionConfig.enabled ? 'ON' : 'OFF'
+      const status = botReactionConfig.enabled ? '🔵 ON' : '🔴 OFF'
       return await message.reply(status)
     }
     
