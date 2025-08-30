@@ -169,7 +169,7 @@ async function downloadVideo(url, messageId) {
   return null
 }
 
-// Method 1: ytdl-core with better error handling and fallback quality
+// Method 1: ytdl-core with better error handling and anti-bot detection
 async function downloadWithYtdl(url, messageId) {
   const videoDir = path.join(__dirname, '../data/downloads/video')
   await fs.ensureDir(videoDir)
@@ -178,7 +178,7 @@ async function downloadWithYtdl(url, messageId) {
   const filepath = path.join(videoDir, filename)
 
   return new Promise((resolve, reject) => {
-    // Try multiple quality options
+    // Try multiple quality options with anti-detection headers
     const qualityOptions = [
       { quality: 'highest', filter: 'videoandaudio' },
       { quality: 'highestvideo', filter: 'videoandaudio' },
@@ -194,7 +194,27 @@ async function downloadWithYtdl(url, messageId) {
         return
       }
 
-      const options = qualityOptions[currentOption]
+      const options = {
+        ...qualityOptions[currentOption],
+        requestOptions: {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Upgrade-Insecure-Requests': '1'
+          }
+        }
+      }
       currentOption++
 
       try {
@@ -222,28 +242,55 @@ async function downloadWithYtdl(url, messageId) {
   })
 }
 
-// Method 2: Alternative API (yt-dlp style)
+// Method 2: Alternative API with better headers to avoid detection
 async function downloadWithCobalt(url, messageId) {
-  const apiUrl = `https://api.cobalt.tools/api/json`
-  
-  const response = await axios.post(apiUrl, {
-    url: url,
-    vQuality: '720',
-    aFormat: 'mp3',
-    filenamePattern: 'basic'
-  }, {
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    },
-    timeout: 45000
-  })
+  try {
+    // Try multiple alternative APIs
+    const apis = [
+      {
+        url: 'https://api.cobalt.tools/api/json',
+        payload: { url: url, vQuality: '720', aFormat: 'mp3', filenamePattern: 'basic' }
+      },
+      {
+        url: 'https://api.vevioz.com/api/button/mp4/480',
+        payload: { url: url }
+      }
+    ]
 
-  if (response.data?.url) {
-    return await downloadFromDirectUrl(response.data.url, messageId)
+    for (const api of apis) {
+      try {
+        const response = await axios.post(api.url, api.payload, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://cobalt.tools/',
+            'Origin': 'https://cobalt.tools',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin'
+          },
+          timeout: 30000
+        })
+
+        if (response.data?.url) {
+          return await downloadFromDirectUrl(response.data.url, messageId)
+        }
+      } catch (err) {
+        console.log(`API ${api.url} failed:`, err.message)
+        continue
+      }
+    }
+    
+    throw new Error('All alternative APIs failed')
+  } catch (error) {
+    throw new Error(`Alternative API: ${error.message}`)
   }
-  throw new Error('No download URL from alternative API')
 }
 
 // Method 3: Y2mate API alternative
