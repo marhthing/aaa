@@ -41,8 +41,7 @@ bot(
     setTimeout(() => {
       console.log('🔄 Bot restart requested by owner')
       process.exit(1) // Exit code 1 will trigger restart in manager
-    }, 2000)()
-    }, 3000)
+    }, 2000)
   }
 )
 
