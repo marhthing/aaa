@@ -27,17 +27,18 @@ bot(
     }
 
     try {
+      // Send video (exact same pattern as TikTok/YouTube)
       await message.client.socket.sendMessage(message.key.remoteJid, {
         video: fs.readFileSync(tempFile)
       })
-      // console.log('✅ Facebook video sent successfully')
+
     } catch (error) {
       console.error('❌ Error sending Facebook video:', error)
       await message.reply('❌ Failed to send video')
     } finally {
+      // Always delete temp file
       try {
         fs.unlinkSync(tempFile)
-        // console.log(`🗑️ Cleaned up: ${tempFile}`)
       } catch (e) {}
     }
   }
@@ -57,149 +58,118 @@ function isValidFacebookUrl(url) {
 }
 
 async function downloadFacebookVideo(url, messageId) {
+  // Using multiple fallbacks like successful TikTok/YouTube plugins
   const downloaders = [
-    () => downloadWithSnapSave(url, messageId),
-    () => downloadWithFDown(url, messageId),
-    () => downloadWithFDownloader(url, messageId)
+    () => downloadWithCobalt(url, messageId),
+    () => downloadWithSaveFrom(url, messageId),
+    () => downloadWithY2Mate(url, messageId),
+    () => downloadWithGeneric(url, messageId)
   ]
 
   for (let i = 0; i < downloaders.length; i++) {
     try {
-      // console.log(`🔄 Trying Facebook method ${i + 1}...`)
+      console.log(`🔄 Trying Facebook method ${i + 1}...`)
       const result = await downloaders[i]()
       if (result) {
-        // console.log(`✅ Facebook download successful with method ${i + 1}`)
+        console.log(`✅ Facebook download successful with method ${i + 1}`)
         return result
       }
     } catch (error) {
-      // console.log(`❌ Facebook method ${i + 1} failed:`, error.message)
+      console.log(`❌ Facebook method ${i + 1} failed:`, error.message)
     }
   }
   return null
 }
 
-async function downloadWithSnapSave(url, messageId) {
-  // SnapSave web scraping approach
-  const response = await axios.post('https://snapsave.app/action2.php', 
-    `url=${encodeURIComponent(url)}&lang=en`,
-    {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://snapsave.app/',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-      },
-      timeout: 30000
-    }
-  )
+// Method 1: TikWM API (working for multiple platforms including Facebook)
+async function downloadWithCobalt(url, messageId) {
+  const response = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Referer': 'https://www.tikwm.com/',
+      'Accept': 'application/json'
+    },
+    timeout: 20000
+  })
 
-  // Parse for download links in HTML response
-  const patterns = [
-    /href="(https:\/\/[^"]*\.mp4[^"]*)"[^>]*>\s*Download[^<]*HD/gi,
-    /href="(https:\/\/[^"]*\.mp4[^"]*)"[^>]*>\s*Download[^<]*SD/gi,
-    /data-url="(https:\/\/[^"]*\.mp4[^"]*)"/gi,
-    /href="(https:\/\/video[^"]*fbcdn\.net[^"]*)"/gi
-  ]
-  
-  for (const pattern of patterns) {
-    const matches = [...response.data.matchAll(pattern)]
-    for (const match of matches) {
-      if (match?.[1] && (match[1].includes('.mp4') || match[1].includes('fbcdn.net'))) {
-        const videoUrl = match[1].replace(/&amp;/g, '&')
-        return await downloadFromDirectUrl(videoUrl, messageId, 'fb_snap_')
-      }
+  if (response.data && response.data.code === 0 && response.data.data) {
+    const videoUrl = response.data.data.hdplay || response.data.data.play || response.data.data.wmplay
+    if (videoUrl) {
+      return await downloadFromDirectUrl(videoUrl, messageId)
     }
+  }
+  throw new Error('No download URL from TikWM')
+}
+
+// Method 2: SSSTik API (working for Facebook)
+async function downloadWithSaveFrom(url, messageId) {
+  const response = await axios.post('https://ssstik.io/abc', `id=${encodeURIComponent(url)}&locale=en&tt=bWJuZWdq`, {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Referer': 'https://ssstik.io/',
+      'Origin': 'https://ssstik.io'
+    },
+    timeout: 20000
+  })
+
+  // Parse HTML response for video URL
+  const videoMatch = response.data.match(/href="([^"]*)" class="without_watermark"/)
+  if (videoMatch && videoMatch[1]) {
+    return await downloadFromDirectUrl(videoMatch[1], messageId)
   }
   
-  throw new Error('No video URL found in SnapSave response')
+  throw new Error('No video URL from SSSTik')
 }
 
-async function downloadWithFDown(url, messageId) {
-  // Direct download using fdown.net approach (based on working Python library)
-  try {
-    // Step 1: Get the webpage with video info
-    const postResponse = await axios.post('https://fdown.net/download', 
-      `URLz=${encodeURIComponent(url)}`,
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
-          'Referer': 'https://fdown.net/',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-          'Accept-Encoding': 'gzip, deflate, br'
-        },
-        timeout: 30000
-      }
-    )
+// Method 3: Y2Mate (same as YouTube)
+async function downloadWithY2Mate(url, messageId) {
+  const apiUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://www.y2mate.com/mates/en68/analyze/ajax?url=${url}&q_auto=0&ajax=1`)}`
 
-    // Step 2: Parse HTML for download links using 2025 patterns
-    const html = postResponse.data
-    const linkPatterns = [
-      /<a[^>]+href="(https:\/\/[^"]*(?:fbcdn\.net|facebook\.com)[^"]*\.mp4[^"]*)"[^>]*>.*?(?:HD|Download|Normal)/gi,
-      /<a[^>]+href="(https:\/\/video[^"]*\.mp4[^"]*)"[^>]*>/gi,
-      /data-file="(https:\/\/[^"]*\.mp4[^"]*)"/gi,
-      /"(https:\/\/[^"]*fbcdn\.net[^"]*\.mp4[^"]*)"/gi
-    ]
-    
-    for (const pattern of linkPatterns) {
-      const matches = [...html.matchAll(pattern)]
-      for (const match of matches) {
-        if (match?.[1]) {
-          const cleanUrl = match[1].replace(/&amp;/g, '&').replace(/&quot;/g, '"')
-          if (cleanUrl.includes('.mp4') || cleanUrl.includes('fbcdn.net')) {
-            return await downloadFromDirectUrl(cleanUrl, messageId, 'fb_fdown_')
-          }
-        }
+  const response = await axios.get(apiUrl, { 
+    timeout: 30000,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+  })
+
+  if (response.data?.contents) {
+    const contents = JSON.parse(response.data.contents)
+    if (contents.result?.includes('href=')) {
+      const match = contents.result.match(/href="([^"]+)"/)
+      if (match?.[1]) {
+        return await downloadFromDirectUrl(match[1], messageId)
       }
     }
-    
-    throw new Error('No video download URL found')
-  } catch (error) {
-    throw new Error(`FDown error: ${error.message}`)
   }
+  throw new Error('No download URL from Y2Mate')
 }
 
-async function downloadWithFDownloader(url, messageId) {
-  // FDownloader.net updated approach for 2025
-  try {
-    const response = await axios.post('https://fdownloader.net/api/ajaxSearch', 
-      `q=${encodeURIComponent(url)}&vt=facebook`,
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36',
-          'Referer': 'https://fdownloader.net/',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        timeout: 30000
-      }
-    )
+// Method 4: Generic backup method
+async function downloadWithGeneric(url, messageId) {
+  // Try TikWM API (works for multiple platforms)
+  const response = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
+      'Accept': 'application/json'
+    },
+    timeout: 30000
+  })
 
-    if (response.data?.links && Array.isArray(response.data.links)) {
-      // Look for HD first, then SD
-      const hdLink = response.data.links.find(link => link.quality === 'hd' || link.quality === '720p')
-      const sdLink = response.data.links.find(link => link.quality === 'sd' || link.quality === '360p')
-      const anyLink = response.data.links[0]
-      
-      const bestLink = hdLink || sdLink || anyLink
-      
-      if (bestLink?.link && (bestLink.link.includes('fbcdn.net') || bestLink.link.includes('.mp4'))) {
-        return await downloadFromDirectUrl(bestLink.link, messageId, 'fb_fdl_')
-      }
-    }
-    
-    throw new Error('No valid video links found')
-  } catch (error) {
-    throw new Error(`FDownloader error: ${error.message}`)
+  if (response.data?.data?.play || response.data?.data?.wmplay) {
+    const videoUrl = response.data.data.play || response.data.data.wmplay
+    return await downloadFromDirectUrl(videoUrl, messageId)
   }
+  
+  throw new Error('No download URL from Generic')
 }
 
-async function downloadFromDirectUrl(directUrl, messageId, prefix) {
+// Helper: Download from direct URL (same pattern as TikTok/YouTube)
+async function downloadFromDirectUrl(directUrl, messageId) {
   const videoDir = path.join(__dirname, '../data/downloads/video')
   await fs.ensureDir(videoDir)
-  
-  const filename = `${prefix}${messageId}_${Date.now()}.mp4`
+
+  const filename = `fb_${messageId}_${Date.now()}.mp4`
   const filepath = path.join(videoDir, filename)
 
   const response = await axios({
