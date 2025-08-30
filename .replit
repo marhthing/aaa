@@ -20,6 +20,15 @@ task = "shell.exec"
 args = "node manager.js"
 
 [[workflows.workflow]]
+name = "MATDEV Bot Manager"
+author = 47051922
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node manager.js"
+
+[[workflows.workflow]]
 name = "Project"
 mode = "parallel"
 author = "agent"
@@ -32,21 +41,12 @@ args = "MATDEV Bot"
 name = "MATDEV Bot"
 author = "agent"
 
-[workflows.workflow.metadata]
-outputType = "console"
-
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node index.js"
 
-[[workflows.workflow]]
-name = "MATDEV Bot Manager"
-author = 47051922
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node manager.js"
+[workflows.workflow.metadata]
+outputType = "console"
 
 [deployment]
 run = ["sh", "-c", "node index.js"]
