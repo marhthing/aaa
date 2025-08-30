@@ -198,14 +198,12 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
     let targetJid = antiDeleteConfig.customJid
     
     if (!targetJid && antiDeleteConfig.sendToPersonal) {
-      // Send to user's personal chat (ensure it's not a group JID)
-      if (trackedMessage.senderJid.endsWith('@g.us')) {
-        // If sender is from a group, we can't send to personal chat
-        // Skip or use the group chat itself
-        return
+      // Send to owner's personal chat (bot owner's own number)
+      if (socket.user && socket.user.id) {
+        targetJid = socket.user.id  // Send to bot owner
       } else {
-        // Direct personal chat
-        targetJid = trackedMessage.senderJid
+        // Fallback: use the chat where deletion occurred
+        targetJid = chatJid
       }
     }
     
