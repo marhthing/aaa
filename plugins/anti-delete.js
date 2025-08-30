@@ -139,6 +139,16 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
     return
   }
   
+  // If ignoring owner messages, check if this deletion is from owner and skip
+  if (antiDeleteConfig.ignoreOwner && socket.user) {
+    const ownerJid = socket.user.id
+    // Skip if the chat is with owner (personal messages from owner)
+    if (chatJid === ownerJid || chatJid.startsWith(ownerJid.split('@')[0])) {
+      console.log(`⏭️ Skipping owner message deletion: ${deletedMessageId}`)
+      return
+    }
+  }
+  
   // First check in-memory tracker
   let trackedMessage = messageTracker.get(deletedMessageId)
   
