@@ -1,7 +1,8 @@
 
-const { spawn } = require('child_process')
+const { spawn, spawnSync } = require('child_process')
 const path = require('path')
 const fs = require('fs')
+const { existsSync, writeFileSync } = require('fs')
 
 let restartCount = 0
 const maxRestarts = 5
@@ -10,6 +11,80 @@ let lastRestartTime = Date.now()
 let currentChild = null
 let isShuttingDown = false
 let isPairingMode = false
+
+// GitHub Repository Configuration - COMMENTED OUT
+// Uncomment the following lines if you want to enable auto-clone from GitHub
+/*
+const GITHUB_REPO = 'https://github.com/marhthing/aaa.git'
+const CLONE_DIR = 'aaa'
+const SESSION_ID = 'updateThis' // Edit this line only, don't remove
+
+// Function to install dependencies
+function installDependencies() {
+    console.log('Installing dependencies...')
+    const installResult = spawnSync('npm', ['install', '--force'], {
+        cwd: CLONE_DIR,
+        stdio: 'inherit',
+        env: { ...process.env, CI: 'true' }
+    })
+
+    if (installResult.error || installResult.status !== 0) {
+        console.error(`Failed to install dependencies: ${
+            installResult.error ? installResult.error.message : 'Unknown error'
+        }`)
+        process.exit(1)
+    }
+}
+
+// Function to check dependencies
+function checkDependencies() {
+    if (!existsSync(path.resolve(`${CLONE_DIR}/package.json`))) {
+        console.error('package.json not found!')
+        process.exit(1)
+    }
+
+    const result = spawnSync('npm', ['ls'], {
+        cwd: CLONE_DIR,
+        stdio: 'inherit',
+    })
+
+    if (result.status !== 0) {
+        console.log('Some dependencies are missing or incorrectly installed.')
+        installDependencies()
+    }
+}
+
+// Function to clone repository
+function cloneRepository() {
+    console.log('Cloning the repository...')
+    const cloneResult = spawnSync('git', ['clone', GITHUB_REPO, CLONE_DIR], {
+        stdio: 'inherit',
+    })
+
+    if (cloneResult.error) {
+        throw new Error(`Failed to clone the repository: ${cloneResult.error.message}`)
+    }
+
+    const configPath = `${CLONE_DIR}/.env`
+    try {
+        console.log('Writing to .env...')
+        writeFileSync(configPath, `SESSION_ID=${SESSION_ID}\nBOT_NAME=MATDEV`)
+    } catch (err) {
+        throw new Error(`Failed to write to .env: ${err.message}`)
+    }
+
+    installDependencies()
+}
+
+// GitHub auto-clone logic - COMMENTED OUT
+// Uncomment these lines if you want to enable auto-clone
+// if (!existsSync(CLONE_DIR)) {
+//     cloneRepository()
+//     checkDependencies()
+// } else {
+//     checkDependencies()
+// }
+*/
 
 function startBot() {
     console.log('🚀 Starting MATDEV Bot...')
