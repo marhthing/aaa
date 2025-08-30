@@ -115,64 +115,84 @@ async function downloadWithSnapSave(url, messageId) {
 }
 
 async function downloadWithFDown(url, messageId) {
-  // FDown.net web scraping approach (no public API available)
-  const response = await axios.post('https://fdown.net/download', 
-    `URLz=${encodeURIComponent(url)}`,
-    {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://fdown.net/',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
-      },
-      timeout: 30000
-    }
-  )
+  // Direct download using fdown.net approach (based on working Python library)
+  try {
+    // Step 1: Get the webpage with video info
+    const postResponse = await axios.post('https://fdown.net/download', 
+      `URLz=${encodeURIComponent(url)}`,
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+          'Referer': 'https://fdown.net/',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br'
+        },
+        timeout: 30000
+      }
+    )
 
-  // Parse HTML response for video URLs (2025 updated patterns)
-  const patterns = [
-    /href="(https:\/\/[^"]*\.mp4[^"]*)"[^>]*>[^<]*(?:HD|Download)/gi,
-    /data-url="(https:\/\/[^"]*\.mp4[^"]*)"/gi,
-    /href="(https:\/\/video[^"]*fbcdn\.net[^"]*)"/gi,
-    /<a[^>]*href="([^"]*)">\s*(?:HD|Download|Normal)/gi
-  ]
-  
-  for (const pattern of patterns) {
-    const matches = [...response.data.matchAll(pattern)]
-    for (const match of matches) {
-      if (match?.[1] && (match[1].includes('.mp4') || match[1].includes('fbcdn.net'))) {
-        const videoUrl = match[1].replace(/&amp;/g, '&') // Decode HTML entities
-        return await downloadFromDirectUrl(videoUrl, messageId, 'fb_fdown_')
+    // Step 2: Parse HTML for download links using 2025 patterns
+    const html = postResponse.data
+    const linkPatterns = [
+      /<a[^>]+href="(https:\/\/[^"]*(?:fbcdn\.net|facebook\.com)[^"]*\.mp4[^"]*)"[^>]*>.*?(?:HD|Download|Normal)/gi,
+      /<a[^>]+href="(https:\/\/video[^"]*\.mp4[^"]*)"[^>]*>/gi,
+      /data-file="(https:\/\/[^"]*\.mp4[^"]*)"/gi,
+      /"(https:\/\/[^"]*fbcdn\.net[^"]*\.mp4[^"]*)"/gi
+    ]
+    
+    for (const pattern of linkPatterns) {
+      const matches = [...html.matchAll(pattern)]
+      for (const match of matches) {
+        if (match?.[1]) {
+          const cleanUrl = match[1].replace(/&amp;/g, '&').replace(/&quot;/g, '"')
+          if (cleanUrl.includes('.mp4') || cleanUrl.includes('fbcdn.net')) {
+            return await downloadFromDirectUrl(cleanUrl, messageId, 'fb_fdown_')
+          }
+        }
       }
     }
+    
+    throw new Error('No video download URL found')
+  } catch (error) {
+    throw new Error(`FDown error: ${error.message}`)
   }
-  
-  throw new Error('No video URL found in FDown response')
 }
 
 async function downloadWithFDownloader(url, messageId) {
-  // Updated 2025 FDownloader API
-  const response = await axios.post('https://fdownloader.net/api/facebook', {
-    url: url
-  }, {
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      'Accept': 'application/json'
-    },
-    timeout: 30000
-  })
+  // FDownloader.net updated approach for 2025
+  try {
+    const response = await axios.post('https://fdownloader.net/api/ajaxSearch', 
+      `q=${encodeURIComponent(url)}&vt=facebook`,
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36',
+          'Referer': 'https://fdownloader.net/',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        timeout: 30000
+      }
+    )
 
-  if (response.data && response.data.success) {
-    const videoData = response.data.data
-    const videoUrl = videoData?.hd_url || videoData?.sd_url || videoData?.video_url
-    
-    if (videoUrl && (videoUrl.includes('fbcdn.net') || videoUrl.includes('facebook.com'))) {
-      return await downloadFromDirectUrl(videoUrl, messageId, 'fb_fdl_')
+    if (response.data?.links && Array.isArray(response.data.links)) {
+      // Look for HD first, then SD
+      const hdLink = response.data.links.find(link => link.quality === 'hd' || link.quality === '720p')
+      const sdLink = response.data.links.find(link => link.quality === 'sd' || link.quality === '360p')
+      const anyLink = response.data.links[0]
+      
+      const bestLink = hdLink || sdLink || anyLink
+      
+      if (bestLink?.link && (bestLink.link.includes('fbcdn.net') || bestLink.link.includes('.mp4'))) {
+        return await downloadFromDirectUrl(bestLink.link, messageId, 'fb_fdl_')
+      }
     }
+    
+    throw new Error('No valid video links found')
+  } catch (error) {
+    throw new Error(`FDownloader error: ${error.message}`)
   }
-  
-  throw new Error('No video URL from FDownloader')
 }
 
 async function downloadFromDirectUrl(directUrl, messageId, prefix) {
