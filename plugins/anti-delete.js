@@ -11,7 +11,7 @@ let antiDeleteConfig = {
   enabled: true,
   sendToPersonal: true, // Send to user's personal chat
   customJid: null, // Optional: specific JID to send deleted messages
-  trackDuration: 24 * 60 * 60 * 1000, // Track messages for 24 hours
+  trackDuration: 3 * 24 * 60 * 60 * 1000, // Track messages for 3 days
   ignoreOwner: true // Don't track owner's deleted messages
 }
 
@@ -40,7 +40,7 @@ async function saveAntiDeleteConfig() {
 }
 
 // Track new messages
-function trackMessage(message, messageText) {
+async function trackMessage(message, messageText, socket) {
   if (!antiDeleteConfig.enabled) return
   
   const messageId = message.key.id
@@ -51,6 +51,25 @@ function trackMessage(message, messageText) {
   // Skip if ignoring owner messages and this is from owner
   if (antiDeleteConfig.ignoreOwner && isFromOwner) return
   
+  // Check if message has media and download it
+  let mediaData = null
+  if (hasMedia(message.message) && socket) {
+    try {
+      const { downloadMedia } = require('../lib/utils')
+      const buffer = await downloadMedia(message, socket)
+      if (buffer) {
+        mediaData = {
+          buffer: buffer,
+          type: getMessageType(message.message),
+          mimetype: getMediaMimetype(message.message),
+          filename: getMediaFilename(message.message)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to download media for tracking:', error)
+    }
+  }
+  
   // Store message data
   messageTracker.set(messageId, {
     id: messageId,
@@ -60,13 +79,50 @@ function trackMessage(message, messageText) {
     timestamp: Date.now(),
     isFromOwner,
     isGroup: chatJid.endsWith('@g.us'),
-    originalMessage: message
+    originalMessage: message,
+    mediaData: mediaData
   })
   
   // Clean up old messages
   setTimeout(() => {
     messageTracker.delete(messageId)
   }, antiDeleteConfig.trackDuration)
+}
+
+// Helper functions for media handling
+function hasMedia(messageContent) {
+  return !!(messageContent.imageMessage || 
+           messageContent.videoMessage || 
+           messageContent.audioMessage || 
+           messageContent.documentMessage || 
+           messageContent.stickerMessage)
+}
+
+function getMessageType(messageContent) {
+  if (messageContent.imageMessage) return 'image'
+  if (messageContent.videoMessage) return 'video'
+  if (messageContent.audioMessage) return 'audio'
+  if (messageContent.documentMessage) return 'document'
+  if (messageContent.stickerMessage) return 'sticker'
+  return 'text'
+}
+
+function getMediaMimetype(messageContent) {
+  if (messageContent.imageMessage) return messageContent.imageMessage.mimetype
+  if (messageContent.videoMessage) return messageContent.videoMessage.mimetype
+  if (messageContent.audioMessage) return messageContent.audioMessage.mimetype
+  if (messageContent.documentMessage) return messageContent.documentMessage.mimetype
+  if (messageContent.stickerMessage) return messageContent.stickerMessage.mimetype
+  return null
+}
+
+function getMediaFilename(messageContent) {
+  if (messageContent.documentMessage?.fileName) return messageContent.documentMessage.fileName
+  if (messageContent.imageMessage) return 'image.jpg'
+  if (messageContent.videoMessage) return 'video.mp4'
+  if (messageContent.audioMessage) return 'audio.ogg'
+  if (messageContent.stickerMessage) return 'sticker.webp'
+  return 'media'
 }
 
 // Handle message deletion detection
@@ -98,10 +154,61 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
     recoveryMessage += `👤 *Sender:* ${senderName}\n`
     recoveryMessage += `💬 *Chat:* ${chatName}\n`
     recoveryMessage += `⏰ *Deleted at:* ${timeDeleted}\n`
-    recoveryMessage += `📝 *Original Message:*\n\n"${trackedMessage.text || '[Media/System Message]'}"`
     
-    // Send recovery message
+    // Send text part if exists
+    if (trackedMessage.text) {
+      recoveryMessage += `📝 *Original Message:*\n\n"${trackedMessage.text}"`
+    }
+    
+    // Send recovery message first
     await socket.sendMessage(targetJid, { text: recoveryMessage })
+    
+    // Send media if available
+    if (trackedMessage.mediaData && trackedMessage.mediaData.buffer) {
+      const mediaData = trackedMessage.mediaData
+      let mediaMessage = {}
+      
+      switch (mediaData.type) {
+        case 'image':
+          mediaMessage = {
+            image: mediaData.buffer,
+            caption: `🗑️ Deleted ${mediaData.type} from ${senderName}`,
+            mimetype: mediaData.mimetype
+          }
+          break
+        case 'video':
+          mediaMessage = {
+            video: mediaData.buffer,
+            caption: `🗑️ Deleted ${mediaData.type} from ${senderName}`,
+            mimetype: mediaData.mimetype
+          }
+          break
+        case 'audio':
+          mediaMessage = {
+            audio: mediaData.buffer,
+            mimetype: mediaData.mimetype,
+            ptt: false
+          }
+          break
+        case 'document':
+          mediaMessage = {
+            document: mediaData.buffer,
+            mimetype: mediaData.mimetype,
+            fileName: `deleted_${mediaData.filename}`
+          }
+          break
+        case 'sticker':
+          mediaMessage = {
+            sticker: mediaData.buffer
+          }
+          break
+      }
+      
+      if (Object.keys(mediaMessage).length > 0) {
+        await socket.sendMessage(targetJid, mediaMessage)
+        console.log(`🗑️ Deleted media (${mediaData.type}) recovered and sent`)
+      }
+    }
     
     console.log(`🗑️ Deleted message recovered and sent to ${targetJid}`)
     
