@@ -5,6 +5,8 @@ const fs = require('fs-extra')
 const path = require('path')
 
 // No cache needed - we search media files directly
+// Deduplication tracker to prevent processing same message multiple times
+const processedMessages = new Set()
 
 
 // Helper function to find media file by message ID (no cache needed)
@@ -212,6 +214,20 @@ bot(
 // Function to handle status updates (when owner posts to status)
 async function handleStatusUpdate(client, message) {
   try {
+    // Deduplication check
+    const messageId = message.key.id
+    if (processedMessages.has(messageId)) {
+      console.log(`⏭️ Skipping already processed status: ${messageId}`)
+      return
+    }
+    processedMessages.add(messageId)
+    
+    // Clean up old entries (keep only last 100)
+    if (processedMessages.size > 100) {
+      const entries = Array.from(processedMessages)
+      entries.slice(0, 50).forEach(id => processedMessages.delete(id))
+    }
+    
     console.log(`🔍 Status update check: remoteJid=${message.key.remoteJid}, participant=${message.key.participant}`)
     
     // Check if this is a status update from the bot owner
@@ -224,52 +240,19 @@ async function handleStatusUpdate(client, message) {
     
     if (!isStatusUpdate) return
     
-    // Handle both owner's status and other people's status
-    if (!isFromOwner) {
-      console.log('📱 Status from other user - will cache for .save feature')
+    // Only log if it's from owner for now (we handle all via direct file search)
+    if (isFromOwner) {
+      // Status from owner
+    } else {
+      // Status from other user - also archived by media system
     }
     
     // Check if status contains media
     if (client.hasMedia(message.message)) {
       const userType = isFromOwner ? 'Owner' : 'User'
-      console.log(`📱 ${userType} posted media status, waiting for media archive to save it...`)
-      
-      // Wait a bit for the media archive system to save the media first
-      setTimeout(async () => {
-        try {
-          // Find the media file that was saved by the media archive system
-          const mediaPath = await findArchivedStatusMedia(message, client)
-          
-          if (mediaPath) {
-            const mediaType = client.getMessageType(message.message)
-            const messageId = message.key.id
-            
-            // Cache reference to the already-saved media file
-            statusMediaCache.set(messageId, {
-              filePath: mediaPath,
-              type: mediaType,
-              mimetype: getMediaMimetype(message.message),
-              timestamp: Date.now(),
-              caption: getMediaCaption(message.message),
-              archived: true // Flag to indicate this is from archive
-            })
-            
-            console.log(`✅ Status media reference cached: ${messageId} -> ${mediaPath}`)
-            
-            // Clean up cache after 24 hours (but don't delete the archived file)
-            setTimeout(() => {
-              statusMediaCache.delete(messageId)
-              console.log(`🗑️ Cleaned up expired status cache: ${messageId}`)
-            }, 24 * 60 * 60 * 1000)
-          } else {
-            console.log('⚠️ Could not find archived media for status')
-          }
-        } catch (error) {
-          console.error('Error finding archived status media:', error)
-        }
-      }, 2000) // 2 second delay to let media archive save first
+      console.log(`📱 ${userType} posted media status (archived by media system)`)
     } else {
-      console.log('📱 Owner posted text status (no media)')
+      console.log('📱 Text status posted (no media)')
     }
     
   } catch (error) {
@@ -277,42 +260,18 @@ async function handleStatusUpdate(client, message) {
   }
 }
 
-// Helper function to find media that was already saved by the media archive system
-async function findArchivedStatusMedia(message, client) {
-  try {
-    const mediaType = client.getMessageType(message.message)
-    const messageId = message.key.id
-    const senderJid = message.key.participant || message.sender
-    const senderNumber = senderJid.split('@')[0]
-    
-    // Media archive saves with pattern: {senderNumber}_{messageId}_{timestamp}.{extension}
-    const mediaDir = path.join(config.MEDIA_DIR, mediaType)
-    
-    // Look for files that match the sender and message ID pattern
-    const files = await fs.readdir(mediaDir).catch(() => [])
-    const matchingFile = files.find(file => 
-      file.startsWith(`${senderNumber}_${messageId}_`)
-    )
-    
-    if (matchingFile) {
-      const fullPath = path.join(mediaDir, matchingFile)
-      // Verify file exists and is readable
-      const fileExists = await fs.pathExists(fullPath)
-      if (fileExists) {
-        return fullPath
-      }
-    }
-    
-    return null
-  } catch (error) {
-    console.error('Error finding archived media:', error)
-    return null
-  }
-}
 
 // Function to handle replies to status
 async function handleStatusReply(client, message) {
   try {
+    // Deduplication check for reply processing
+    const replyId = message.key.id
+    if (processedMessages.has(`reply_${replyId}`)) {
+      console.log(`⏭️ Skipping already processed reply: ${replyId}`)
+      return
+    }
+    processedMessages.add(`reply_${replyId}`)
+    
     const text = require('../lib/utils').getMessageText(message)
     if (!text) return
     
