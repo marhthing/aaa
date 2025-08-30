@@ -116,6 +116,11 @@ bot(
     type: 'utility',
   },
   async (message, match) => {
+    // Allow access for status-related saves
+    const isStatusReply = message.message?.extendedTextMessage?.contextInfo?.quotedMessage
+    if (!message.client.isOwnerJid(message.sender) && !isStatusReply) {
+      return await message.reply('❌ Access denied: Only owner can use this command')
+    }
     try {
       console.log('🔍 Save command started - checking quoted message...')
       
