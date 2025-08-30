@@ -154,62 +154,35 @@ bot(
 bot(
   {
     pattern: 'pm ?(.*)',
-    desc: 'Show permissions for current user in private chat',
-    type: 'misc',
-  },
-  async (message, match) => {
-    // Only works in private chats
-    if (message.isGroup) {
-      return await message.reply('❌ Use `.pim @user` in group chats to check user permissions')
-    }
-    
-    const targetJid = message.key.remoteJid
-    const allowedCommands = message.client.allowedUsers.get(targetJid) || []
-    
-    const displayName = targetJid.includes('@') ? targetJid.split('@')[0] : targetJid
-    
-    if (allowedCommands.length === 0) {
-      return await message.reply(`📋 **Permissions for ${displayName}:**\n\n❌ No special permissions granted\n\n💡 Contact owner to request command access`)
-    }
-    
-    let permissionsList = `📋 **Permissions for ${displayName}:**\n\n`
-    permissionsList += `✅ **Allowed Commands:**\n• .${allowedCommands.join('\n• .')}\n\n`
-    permissionsList += `💡 Total: ${allowedCommands.length} command(s)`
-    
-    return await message.reply(permissionsList)
-  }
-)
-
-bot(
-  {
-    pattern: 'pim ?(.*)',
-    desc: 'Show permissions for tagged user in group chat',
+    desc: 'Show permissions for user',
     type: 'misc',
   },
   async (message, match) => {
     let targetJid = null
     
-    // Check for mentioned users
-    if (message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.length > 0) {
-      targetJid = message.message.extendedTextMessage.contextInfo.mentionedJid[0]
+    // In group chats, check for mentioned users
+    if (message.isGroup) {
+      if (message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.length > 0) {
+        targetJid = message.message.extendedTextMessage.contextInfo.mentionedJid[0]
+      } else {
+        return await message.reply('❌ Tag a user to check their permissions')
+      }
     } else {
-      return await message.reply('❌ Please tag a user to check their permissions:\n• `.pim @user`')
+      // In private chat, target is the other participant
+      targetJid = message.key.remoteJid
     }
     
     const allowedCommands = message.client.allowedUsers.get(targetJid) || []
-    const displayName = targetJid.includes('@') ? targetJid.split('@')[0] : targetJid
     
     if (allowedCommands.length === 0) {
-      return await message.reply(`📋 **Permissions for ${displayName}:**\n\n❌ No special permissions granted\n\n💡 Owner can use \`.allow @${displayName} <command>\` to grant access`)
+      return await message.reply('❌ No commands')
     }
     
-    let permissionsList = `📋 **Permissions for ${displayName}:**\n\n`
-    permissionsList += `✅ **Allowed Commands:**\n• .${allowedCommands.join('\n• .')}\n\n`
-    permissionsList += `💡 Total: ${allowedCommands.length} command(s)`
-    
-    return await message.reply(permissionsList)
+    return await message.reply(`✅ Commands: ${allowedCommands.join(', ')}`)
   }
 )
+
+
 
 bot(
   {
