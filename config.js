@@ -32,7 +32,7 @@ module.exports = {
     // Core Features
     AUTO_RELOAD_PLUGINS: toBool(process.env.AUTO_RELOAD_PLUGINS) ?? true,
     ENABLE_MEDIA_DOWNLOAD: toBool(process.env.ENABLE_MEDIA_DOWNLOAD) ?? true,
-    ENABLE_MESSAGE_ARCHIVE: toBool(process.env.ENABLE_MESSAGE_ARCHIVE) ?? true,
+    ENABLE_MESSAGE_ARCHIVE: true, // Always enabled - no override allowed
     ENABLE_WEB_INTERFACE: toBool(process.env.ENABLE_WEB_INTERFACE) ?? true,
     ENABLE_ANTI_DELETE: toBool(process.env.ENABLE_ANTI_DELETE) ?? true,
     ENABLE_GAMES: toBool(process.env.ENABLE_GAMES) ?? true,
