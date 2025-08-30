@@ -22,7 +22,7 @@ bot(
 bot(
   {
     pattern: 'save',
-    desc: 'Save status media to personal chat',
+    desc: 'Save status media to bot owner personal chat',
     type: 'utility',
   },
   async (message, match) => {
@@ -45,19 +45,67 @@ bot(
         return await message.reply('❌ No media found for this status. Media may have expired or not been cached.')
       }
 
-      // Send the cached media to owner's personal chat
-      const ownerJid = message.sender // The person who used .save command
-      console.log(`💾 Saving status media to ${ownerJid}'s personal chat`)
+      // Send the cached media to bot owner's personal chat
+      const botOwnerJid = message.client.ownerJid
+      console.log(`💾 Saving status media to bot owner's personal chat: ${botOwnerJid}`)
       
       const mediaMessage = await createMediaMessage(cachedMedia)
-      await message.client.socket.sendMessage(ownerJid, mediaMessage)
+      await message.client.socket.sendMessage(botOwnerJid, mediaMessage)
       
-      await message.reply('✅ Status media saved to your personal chat!')
-      console.log(`✅ Status media saved for ${ownerJid}`)
+      await message.reply('✅ Status media saved to bot owner personal chat!')
+      console.log(`✅ Status media saved for bot owner: ${botOwnerJid}`)
       
     } catch (error) {
       console.error('Error saving status media:', error)
       await message.reply('❌ Failed to save status media. Please try again.')
+    }
+  }
+)
+
+bot(
+  {
+    pattern: 'send ?(.*)',
+    desc: 'Send status media to specified JID',
+    type: 'utility',
+  },
+  async (message, match) => {
+    try {
+      const targetJid = match[1]?.trim()
+      
+      if (!targetJid) {
+        return await message.reply('❌ Please specify a JID: .send <jid>\nExample: .send 2347012345678@s.whatsapp.net')
+      }
+
+      // Check if this is a reply to a status
+      const quotedMessage = message.message?.extendedTextMessage?.contextInfo?.quotedMessage
+      if (!quotedMessage) {
+        return await message.reply('❌ Please reply to a status message with .send <jid> to send the media')
+      }
+
+      // Get the quoted message ID
+      const quotedMessageId = message.message?.extendedTextMessage?.contextInfo?.stanzaId
+      if (!quotedMessageId) {
+        return await message.reply('❌ Unable to identify the status message')
+      }
+
+      // Check if we have cached media for this status
+      const cachedMedia = statusMediaCache.get(quotedMessageId)
+      if (!cachedMedia) {
+        return await message.reply('❌ No media found for this status. Media may have expired or not been cached.')
+      }
+
+      // Send the cached media to specified JID
+      console.log(`💾 Sending status media to specified JID: ${targetJid}`)
+      
+      const mediaMessage = await createMediaMessage(cachedMedia)
+      await message.client.socket.sendMessage(targetJid, mediaMessage)
+      
+      await message.reply(`✅ Status media sent to ${targetJid}!`)
+      console.log(`✅ Status media sent to specified JID: ${targetJid}`)
+      
+    } catch (error) {
+      console.error('Error sending status media to JID:', error)
+      await message.reply('❌ Failed to send status media. Please check the JID and try again.')
     }
   }
 )
