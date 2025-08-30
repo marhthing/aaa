@@ -19,6 +19,8 @@ bot(
       return await message.reply('❌ Invalid Facebook URL')
     }
 
+    await message.reply('⏳ Downloading Facebook video...')
+    
     const tempFile = await downloadFacebookVideo(url, message.key.id)
     if (!tempFile) {
       return await message.reply('❌ Download failed')
