@@ -26,7 +26,7 @@ bot(
 bot(
   {
     pattern: 'restart ?(.*)',
-    desc: 'Restart the bot connection',
+    desc: 'Restart the bot process',
     type: 'system',
   },
   async (message, match) => {
@@ -35,12 +35,13 @@ bot(
       return await message.reply('❌ Only owner can restart the bot')
     }
     
-    await message.reply('🔄 *Bot Restarting Connection...*\n\nReconnecting in 3 seconds! ⚡')
+    await message.reply('🔄 *Bot Restarting...*\n\nI\'ll be back in a moment! ⚡')
     
     // Give time for the message to be sent
-    setTimeout(async () => {
-      console.log('🔄 Bot restart requested by owner - reconnecting...')
-      await message.client.restart()
+    setTimeout(() => {
+      console.log('🔄 Bot restart requested by owner')
+      process.exit(1) // Exit code 1 will trigger restart in manager
+    }, 2000)()
     }, 3000)
   }
 )

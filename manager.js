@@ -18,6 +18,14 @@ function startBot() {
     child.on('exit', (code, signal) => {
         console.log(`🔄 Bot process exited with code ${code} and signal ${signal}`)
         
+        // Handle different exit codes
+        if (code === 1) {
+            // Exit code 1 = restart requested
+            console.log('🔄 Restart requested, restarting bot...')
+            setTimeout(() => startBot(), 2000)
+            return
+        }
+        
         // Only restart on unexpected exits (not manual shutdown)
         if (code !== 0 && signal !== 'SIGTERM' && signal !== 'SIGINT') {
             const currentTime = Date.now()
