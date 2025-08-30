@@ -79,62 +79,75 @@ async function downloadFacebookVideo(url, messageId) {
 }
 
 async function downloadWithSnapSave(url, messageId) {
-  // Updated 2025 SnapSave API endpoint
-  const response = await axios.post('https://snapsave.app/action.php', 
-    { 
-      url: url,
-      lang: 'en'
-    },
+  // SnapSave web scraping approach
+  const response = await axios.post('https://snapsave.app/action2.php', 
+    `url=${encodeURIComponent(url)}&lang=en`,
     {
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Referer': 'https://snapsave.app/',
-        'Accept': 'application/json'
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       },
       timeout: 30000
     }
   )
 
-  // Updated patterns for 2025 response format
-  if (response.data && response.data.success) {
-    const links = response.data.data?.links || []
-    for (const link of links) {
-      if (link.url && link.quality && link.url.includes('.mp4')) {
-        return await downloadFromDirectUrl(link.url, messageId, 'fb_snap_')
+  // Parse for download links in HTML response
+  const patterns = [
+    /href="(https:\/\/[^"]*\.mp4[^"]*)"[^>]*>\s*Download[^<]*HD/gi,
+    /href="(https:\/\/[^"]*\.mp4[^"]*)"[^>]*>\s*Download[^<]*SD/gi,
+    /data-url="(https:\/\/[^"]*\.mp4[^"]*)"/gi,
+    /href="(https:\/\/video[^"]*fbcdn\.net[^"]*)"/gi
+  ]
+  
+  for (const pattern of patterns) {
+    const matches = [...response.data.matchAll(pattern)]
+    for (const match of matches) {
+      if (match?.[1] && (match[1].includes('.mp4') || match[1].includes('fbcdn.net'))) {
+        const videoUrl = match[1].replace(/&amp;/g, '&')
+        return await downloadFromDirectUrl(videoUrl, messageId, 'fb_snap_')
       }
     }
   }
   
-  throw new Error('No video URL from SnapSave')
+  throw new Error('No video URL found in SnapSave response')
 }
 
 async function downloadWithFDown(url, messageId) {
-  // Updated 2025 FDown API endpoint
-  const response = await axios.post('https://fdown.net/api/download', 
-    {
-      url: url
-    },
+  // FDown.net web scraping approach (no public API available)
+  const response = await axios.post('https://fdown.net/download', 
+    `URLz=${encodeURIComponent(url)}`,
     {
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Referer': 'https://fdown.net/',
-        'Accept': 'application/json'
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
       },
       timeout: 30000
     }
   )
 
-  // Updated for 2025 JSON response format
-  if (response.data && response.data.status === 'success') {
-    const videoUrl = response.data.data?.hd || response.data.data?.sd
-    if (videoUrl && videoUrl.includes('fbcdn.net')) {
-      return await downloadFromDirectUrl(videoUrl, messageId, 'fb_fdown_')
+  // Parse HTML response for video URLs (2025 updated patterns)
+  const patterns = [
+    /href="(https:\/\/[^"]*\.mp4[^"]*)"[^>]*>[^<]*(?:HD|Download)/gi,
+    /data-url="(https:\/\/[^"]*\.mp4[^"]*)"/gi,
+    /href="(https:\/\/video[^"]*fbcdn\.net[^"]*)"/gi,
+    /<a[^>]*href="([^"]*)">\s*(?:HD|Download|Normal)/gi
+  ]
+  
+  for (const pattern of patterns) {
+    const matches = [...response.data.matchAll(pattern)]
+    for (const match of matches) {
+      if (match?.[1] && (match[1].includes('.mp4') || match[1].includes('fbcdn.net'))) {
+        const videoUrl = match[1].replace(/&amp;/g, '&') // Decode HTML entities
+        return await downloadFromDirectUrl(videoUrl, messageId, 'fb_fdown_')
+      }
     }
   }
   
-  throw new Error('No video URL from FDown')
+  throw new Error('No video URL found in FDown response')
 }
 
 async function downloadWithFDownloader(url, messageId) {
