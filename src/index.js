@@ -34,10 +34,8 @@ class WhatsAppBot {
             this.performanceMonitor = new PerformanceMonitor();
             await this.performanceMonitor.initialize();
 
-            // Setup web interface
-            if (process.env.ENABLE_WEB_INTERFACE === 'true') {
-                await this.setupWebInterface();
-            }
+            // Setup web interface (always enabled for Replit compatibility)
+            await this.setupWebInterface();
 
             // Initialize bot client
             this.botClient = new BotClient();

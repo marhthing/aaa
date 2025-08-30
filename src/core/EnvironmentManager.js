@@ -38,7 +38,7 @@ class EnvironmentManager {
             const defaultUserEnv = `# MATDEV Bot - User Configuration
 # This file is automatically created and managed by the bot
 NODE_ENV=development
-ENABLE_WEB_INTERFACE=false
+ENABLE_WEB_INTERFACE=true
 AUTO_RELOAD_PLUGINS=true
 ENABLE_MEDIA_DOWNLOAD=true
 ENABLE_MESSAGE_ARCHIVE=true
