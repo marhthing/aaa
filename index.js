@@ -7,12 +7,16 @@ const start = async () => {
         console.log('🚀 Starting WhatsApp Personal Assistant...')
         
         // Create and connect bot client
+        console.log('📱 Creating bot client...')
         const bot = new Client()
+        console.log('✅ Bot client created')
         
         // Small delay to ensure proper initialization
         await new Promise(resolve => setTimeout(resolve, 1000))
         
+        console.log('📞 Calling bot.connect()...')
         await bot.connect()
+        console.log('✅ Bot connected successfully')
         
         // Setup graceful shutdown
         const shutdown = async () => {
