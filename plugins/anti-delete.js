@@ -171,26 +171,26 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
     }
   }
   
-  // If ignoring owner messages, check if this deletion is from owner and skip
-  if (antiDeleteConfig.ignoreOwner && socket.user) {
-    const ownerJid = socket.user.id
-    const normalizedChatJid = normalizeJid(chatJid)
-    const normalizedOwnerJid = normalizeJid(ownerJid)
-    
-    // Skip if the chat is with owner (personal messages from owner)
-    if (normalizedChatJid === normalizedOwnerJid) {
-      console.log(`⏭️ Skipping owner message deletion: ${deletedMessageId}`)
-      return
-    }
-  }
-  
-  // First check in-memory tracker
+  // Check if message exists first to determine sender
   let trackedMessage = messageTracker.get(deletedMessageId)
   
-  // If not found in memory, search in archived messages
+  // If not found in memory, search in archived messages for sender info
   if (!trackedMessage) {
     console.log(`🔍 Message not in memory tracker, searching in archived messages...`)
     trackedMessage = await searchArchivedMessage(deletedMessageId, chatJid)
+  }
+  
+  // If ignoring owner messages, check if the ORIGINAL SENDER was the owner
+  if (antiDeleteConfig.ignoreOwner && socket.user && trackedMessage) {
+    const ownerJid = socket.user.id
+    const normalizedOwnerJid = normalizeJid(ownerJid)
+    const normalizedSenderJid = normalizeJid(trackedMessage.senderJid)
+    
+    // Skip only if the SENDER was the owner (not just if it's in owner's chat)
+    if (normalizedSenderJid === normalizedOwnerJid || trackedMessage.isFromOwner) {
+      console.log(`⏭️ Skipping owner's own message deletion: ${deletedMessageId}`)
+      return
+    }
   }
   
   if (!trackedMessage) {
