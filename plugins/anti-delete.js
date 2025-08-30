@@ -67,10 +67,7 @@ async function trackMessage(message, messageText, socket) {
     return
   }
 
-  // Only log tracking for debugging, not every message
-  if (process.env.DEBUG_ANTI_DELETE === 'true') {
-    console.log(`📝 Tracking message: ${messageId} from ${senderJid} in ${chatJid}`)
-  }
+  // Removed excessive tracking logs
 
   // Check if message has media and download it
   let mediaData = null
@@ -148,16 +145,12 @@ function getMediaFilename(messageContent) {
 
 // Handle message deletion detection
 async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
-  console.log(`🗑️ Deletion handler called for: ${deletedMessageId} in ${chatJid}`)
-
   if (!antiDeleteConfig.enabled) {
-    console.log(`❌ Anti-delete disabled, skipping`)
     return
   }
 
   // Check if the chat is a status broadcast, if so, ignore
   if (chatJid.endsWith('@broadcast')) {
-    console.log(`⏭️ Skipping deletion from status broadcast: ${deletedMessageId}`)
     return
   }
 
@@ -168,7 +161,6 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
   const now = Date.now()
   const lastProcessed = deletionCache.get(deletionKey)
   if (lastProcessed && (now - lastProcessed) < 5000) {
-    console.log(`⏭️ Duplicate deletion event ignored: ${deletedMessageId}`)
     return
   }
 
@@ -187,7 +179,6 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
 
   // If not found in memory, search in archived messages for sender info
   if (!trackedMessage) {
-    console.log(`🔍 Message not in memory tracker, searching in archived messages...`)
     trackedMessage = await searchArchivedMessage(deletedMessageId, chatJid)
   }
 
@@ -199,18 +190,13 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
 
     // Skip only if the SENDER was the owner (not just if it's in owner's chat)
     if (normalizedSenderJid === normalizedOwnerJid || trackedMessage.isFromOwner) {
-      console.log(`⏭️ Skipping owner's own message deletion: ${deletedMessageId}`)
       return
     }
   }
 
   if (!trackedMessage) {
-    console.log(`❌ Message not found in tracker or archives: ${deletedMessageId}`)
-    console.log(`📊 Currently tracking ${messageTracker.size} messages`)
     return
   }
-
-  console.log(`✅ Found deleted message in tracker: ${deletedMessageId}`)
 
   try {
     // Determine where to send the deleted message
@@ -306,11 +292,8 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
 
       if (Object.keys(mediaMessage).length > 0) {
         await socket.sendMessage(targetJid, mediaMessage)
-        console.log(`🗑️ Deleted media (${mediaData.type}) recovered and sent`)
       }
     }
-
-    console.log(`🗑️ Deleted message recovered and sent to ${targetJid}`)
 
   } catch (error) {
     console.error('Error handling deleted message:', error)
@@ -345,8 +328,6 @@ async function searchArchivedMessage(messageId, chatJid) {
         const foundMessage = messages.find(msg => msg.id === messageId)
 
         if (foundMessage) {
-          console.log(`✅ Found deleted message in archives: ${messageId}`)
-
           // Convert archived message to tracker format
           return {
             id: foundMessage.id,
