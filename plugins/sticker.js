@@ -3,6 +3,7 @@ const sharp = require('sharp')
 const ffmpeg = require('fluent-ffmpeg')
 const fs = require('fs-extra')
 const path = require('path')
+const { writeExif } = require('../lib/utils')
 
 bot(
   {
@@ -58,13 +59,16 @@ bot(
       // Get sticker pack name from environment or use bot name
       const packName = process.env.STICKER_NAME || 'MATDEV Bot'
       
+      // Add metadata to sticker
+      const stickerWithMeta = await writeExif(stickerResult.buffer, {
+        packname: packName,
+        author: 'MATDEV Bot'
+      })
+      
       try {
-        // Send sticker with proper metadata
+        // Send sticker with embedded metadata
         await message.client.socket.sendMessage(message.key.remoteJid, {
-          sticker: stickerResult.buffer
-        }, {
-          packname: packName,
-          author: 'MATDEV Bot'
+          sticker: stickerWithMeta
         })
         
         // Success reaction - check bot reaction config
