@@ -178,19 +178,6 @@ function cloneRepository() {
 function setupBot() {
     console.log('🔍 Checking bot setup...')
 
-    // Check for update flag first - if present, force clone regardless of existing files
-    const updateFlagPath = path.resolve('.update_flag')
-    if (existsSync(updateFlagPath)) {
-        console.log('🔄 Update flag detected in setupBot - forcing reclone...')
-        try {
-            fs.unlinkSync(updateFlagPath) // Remove the flag file
-            console.log('🗑️ Update flag removed')
-        } catch (err) {
-            console.error('⚠️ Could not remove update flag:', err.message)
-        }
-        return cloneRepository()
-    }
-
     // Check if bot.js exists in root (priority check)
     if (existsSync('bot.js')) {
         console.log('✅ bot.js found in root directory - skipping clone')
