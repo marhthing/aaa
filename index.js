@@ -27,6 +27,13 @@ const start = async () => {
     // Function to attempt connection with retry logic
     const connectWithRetry = async (retryCount = 0) => {
         try {
+            // Check if bot is already connected before attempting
+            const status = bot.getStatus()
+            if (status.ready) {
+                console.log('✅ Bot already connected and ready')
+                return
+            }
+            
             console.log('📞 Calling bot.connect()...')
             await bot.connect()
             console.log('✅ Bot connected successfully')
