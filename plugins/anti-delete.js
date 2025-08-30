@@ -220,55 +220,76 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
     // Get sender name (remove @s.whatsapp.net and any numbers after ':')
     const senderName = trackedMessage.senderJid.split('@')[0].split(':')[0]
     
-    // Send text part if exists using tag format like WhatsApp
+    // Create quoted message structure to make it look like a reply/tag
     if (trackedMessage.text) {
-      // Create a tagged message format similar to WhatsApp quote style
-      const taggedMessage = `┌ ${senderName}\n│ ${trackedMessage.text}\n└ 🗑️ _This message was deleted_`
+      // Send as quoted message to simulate tagging
+      const quotedMessage = {
+        text: `🗑️ _This message was deleted_`,
+        contextInfo: {
+          stanzaId: trackedMessage.id,
+          participant: trackedMessage.senderJid,
+          quotedMessage: {
+            conversation: trackedMessage.text
+          }
+        }
+      }
       
-      await socket.sendMessage(targetJid, { text: taggedMessage })
+      await socket.sendMessage(targetJid, quotedMessage)
     } else {
-      // For media-only messages
-      const taggedMessage = `┌ ${senderName}\n└ 🗑️ _This media was deleted_`
-      await socket.sendMessage(targetJid, { text: taggedMessage })
+      // For media-only messages, send simple notification
+      await socket.sendMessage(targetJid, { 
+        text: `🗑️ _${senderName} deleted a message_` 
+      })
     }
     
-    // Send media if available
+    // Send media if available with quoted context
     if (trackedMessage.mediaData && trackedMessage.mediaData.buffer) {
       const mediaData = trackedMessage.mediaData
       let mediaMessage = {}
+      
+      // Create contextInfo for media to show it was deleted
+      const contextInfo = {
+        stanzaId: trackedMessage.id,
+        participant: trackedMessage.senderJid
+      }
       
       switch (mediaData.type) {
         case 'image':
           mediaMessage = {
             image: mediaData.buffer,
-            caption: `🗑️ _Deleted by ${senderName}_`,
-            mimetype: mediaData.mimetype
+            caption: `🗑️ _This image was deleted_`,
+            mimetype: mediaData.mimetype,
+            contextInfo: contextInfo
           }
           break
         case 'video':
           mediaMessage = {
             video: mediaData.buffer,
-            caption: `🗑️ _Deleted by ${senderName}_`,
-            mimetype: mediaData.mimetype
+            caption: `🗑️ _This video was deleted_`,
+            mimetype: mediaData.mimetype,
+            contextInfo: contextInfo
           }
           break
         case 'audio':
           mediaMessage = {
             audio: mediaData.buffer,
             mimetype: mediaData.mimetype,
-            ptt: false
+            ptt: false,
+            contextInfo: contextInfo
           }
           break
         case 'document':
           mediaMessage = {
             document: mediaData.buffer,
             mimetype: mediaData.mimetype,
-            fileName: mediaData.filename || 'deleted_file'
+            fileName: mediaData.filename || 'deleted_file',
+            contextInfo: contextInfo
           }
           break
         case 'sticker':
           mediaMessage = {
-            sticker: mediaData.buffer
+            sticker: mediaData.buffer,
+            contextInfo: contextInfo
           }
           break
       }
