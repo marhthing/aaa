@@ -46,7 +46,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node index.js"
+args = "node bot.js"
 
 [deployment]
 run = ["sh", "-c", "node index.js"]
