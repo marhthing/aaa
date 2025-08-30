@@ -3,7 +3,7 @@ const sharp = require('sharp')
 const ffmpeg = require('fluent-ffmpeg')
 const fs = require('fs-extra')
 const path = require('path')
-const { writeExif } = require('../lib/utils')
+const { Sticker, StickerTypes } = require('wa-sticker-formatter')
 
 bot(
   {
@@ -50,40 +50,34 @@ bot(
         return await message.reply('❌ Failed to download media')
       }
       
-      // Convert to sticker and save to data folder first
-      const stickerResult = await convertToSticker(buffer, mediaType, message.key.id)
-      if (!stickerResult) {
-        return await message.reply('❌ Failed to convert media to sticker')
-      }
-      
       // Get sticker pack name from environment or use bot name
-      const packName = process.env.STICKER_NAME || 'MATDEV Bot'
+      const packName = process.env.STICKER_PACKNAME || 'MATDEV Bot'
+      const authorName = process.env.STICKER_AUTHOR || 'MATDEV Bot'
       
-      // Add metadata to sticker
-      const stickerWithMeta = await writeExif(stickerResult.buffer, {
-        packname: packName,
-        author: 'MATDEV Bot'
+      // Create sticker with proper metadata using wa-sticker-formatter
+      const sticker = new Sticker(buffer, {
+        pack: packName,
+        author: authorName,
+        type: StickerTypes.FULL,
+        categories: ['🤖'],
+        id: Date.now().toString(),
+        quality: 50,
+        background: 'transparent'
       })
       
       try {
-        // Send sticker with embedded metadata
-        await message.client.socket.sendMessage(message.key.remoteJid, {
-          sticker: stickerWithMeta
-        })
+        // Convert to message format and send
+        const stickerMessage = await sticker.toMessage()
+        await message.client.socket.sendMessage(message.key.remoteJid, stickerMessage)
+        
+        console.log(`✅ Sticker sent with metadata: Pack="${packName}", Author="${authorName}"`)
         
         // Success reaction - check bot reaction config
         // For now, skip reactions until we fix the bot reaction system
         
-      } finally {
-        // Always cleanup the temporary sticker file
-        if (stickerResult.tempPath) {
-          try {
-            fs.unlinkSync(stickerResult.tempPath)
-            console.log(`🗑️ Cleaned up sticker file: ${stickerResult.tempPath}`)
-          } catch (cleanupError) {
-            console.error('❌ Failed to cleanup sticker file:', cleanupError)
-          }
-        }
+      } catch (stickerError) {
+        console.error('❌ Failed to create sticker with metadata:', stickerError)
+        await message.reply('❌ Failed to create sticker')
       }
       
     } catch (error) {
@@ -93,88 +87,3 @@ bot(
   }
 )
 
-async function convertToSticker(buffer, mediaType, messageId) {
-  try {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    
-    if (mediaType === 'image') {
-      // Convert image to WebP sticker format without black background
-      const stickerBuffer = await sharp(buffer)
-        .resize(512, 512, {
-          fit: 'inside',
-          withoutEnlargement: true,
-          background: { r: 0, g: 0, b: 0, alpha: 0 }
-        })
-        .webp({ quality: 90 })
-        .toBuffer()
-      
-      // Save to data folder temporarily
-      const stickerDir = path.join(__dirname, '../data/downloads/sticker')
-      const stickerPath = path.join(stickerDir, `${messageId}_${timestamp}.webp`)
-      await fs.ensureDir(stickerDir)
-      await fs.writeFile(stickerPath, stickerBuffer)
-      
-      console.log(`💾 Sticker saved temporarily: ${stickerPath}`)
-      
-      return {
-        buffer: stickerBuffer,
-        tempPath: stickerPath
-      }
-    } else if (mediaType === 'video') {
-      // Convert video to animated WebP
-      return new Promise((resolve, reject) => {
-        const tempInput = path.join(__dirname, '../data/downloads/temp_input.mp4')
-        const tempOutput = path.join(__dirname, '../data/downloads/sticker', `${messageId}_${timestamp}.webp`)
-        
-        // Ensure sticker directory exists
-        const stickerDir = path.dirname(tempOutput)
-        fs.ensureDirSync(stickerDir)
-        
-        // Save input buffer
-        fs.writeFileSync(tempInput, buffer)
-        
-        ffmpeg(tempInput)
-          .outputOptions([
-            '-vf', 'scale=512:512:force_original_aspect_ratio=decrease:eval=frame,format=rgba,pad=512:512:-1:-1:color=0x00000000',
-            '-loop', '0',
-            '-preset', 'default',
-            '-an',
-            '-vsync', '0',
-            '-s', '512x512'
-          ])
-          .toFormat('webp')
-          .output(tempOutput)
-          .on('end', () => {
-            try {
-              const stickerBuffer = fs.readFileSync(tempOutput)
-              // Clean up input temp file
-              fs.unlinkSync(tempInput)
-              
-              console.log(`💾 Sticker saved temporarily: ${tempOutput}`)
-              
-              resolve({
-                buffer: stickerBuffer,
-                tempPath: tempOutput
-              })
-            } catch (error) {
-              reject(error)
-            }
-          })
-          .on('error', (error) => {
-            // Clean up temp files on error
-            try {
-              fs.unlinkSync(tempInput)
-              fs.unlinkSync(tempOutput)
-            } catch {}
-            reject(error)
-          })
-          .run()
-      })
-    }
-    
-    return null
-  } catch (error) {
-    console.error('❌ Sticker conversion error:', error)
-    return null
-  }
-}
