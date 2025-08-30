@@ -235,12 +235,8 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
       }
       
       await socket.sendMessage(targetJid, quotedMessage)
-    } else {
-      // For media-only messages, send simple notification
-      await socket.sendMessage(targetJid, { 
-        text: `🗑️ _${senderName} deleted a message_` 
-      })
     }
+    // For media-only messages, don't send any text notification - just the media below
     
     // Send media if available with quoted context and empty quote
     if (trackedMessage.mediaData && trackedMessage.mediaData.buffer) {
