@@ -83,10 +83,13 @@ bot(
                 // Removed: caption: caption
               })
 
-              // Clean up temp file
+              // Clean up temp file immediately after sending
               try {
                 require('fs-extra').unlinkSync(tempFile)
-              } catch (e) {}
+                console.log(`🗑️ TikTok media deleted after sending: ${tempFile}`)
+              } catch (e) {
+                console.error('Failed to delete temp file:', e.message)
+              }
 
               success = true
             }

@@ -19,6 +19,49 @@ bot(
   }
 )
 
+bot(
+  {
+    pattern: 'save',
+    desc: 'Save status media to personal chat',
+    type: 'utility',
+  },
+  async (message, match) => {
+    try {
+      // Check if this is a reply to a status
+      const quotedMessage = message.message?.extendedTextMessage?.contextInfo?.quotedMessage
+      if (!quotedMessage) {
+        return await message.reply('❌ Please reply to a status message with .save to save the media')
+      }
+
+      // Get the quoted message ID
+      const quotedMessageId = message.message?.extendedTextMessage?.contextInfo?.stanzaId
+      if (!quotedMessageId) {
+        return await message.reply('❌ Unable to identify the status message')
+      }
+
+      // Check if we have cached media for this status
+      const cachedMedia = statusMediaCache.get(quotedMessageId)
+      if (!cachedMedia) {
+        return await message.reply('❌ No media found for this status. Media may have expired or not been cached.')
+      }
+
+      // Send the cached media to owner's personal chat
+      const ownerJid = message.sender // The person who used .save command
+      console.log(`💾 Saving status media to ${ownerJid}'s personal chat`)
+      
+      const mediaMessage = await createMediaMessage(cachedMedia)
+      await message.client.socket.sendMessage(ownerJid, mediaMessage)
+      
+      await message.reply('✅ Status media saved to your personal chat!')
+      console.log(`✅ Status media saved for ${ownerJid}`)
+      
+    } catch (error) {
+      console.error('Error saving status media:', error)
+      await message.reply('❌ Failed to save status media. Please try again.')
+    }
+  }
+)
+
 // Function to handle status updates (when owner posts to status)
 async function handleStatusUpdate(client, message) {
   try {
@@ -37,20 +80,39 @@ async function handleStatusUpdate(client, message) {
       if (mediaBuffer) {
         const mediaType = client.getMessageType(message.message)
         const messageId = message.key.id
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
         
-        // Cache media with metadata
+        // Save media to data folder
+        const extension = getMediaExtension(message.message)
+        const fileName = `status_${messageId}_${timestamp}${extension}`
+        const mediaPath = path.join(__dirname, '../data/media', mediaType, fileName)
+        
+        await fs.ensureDir(path.dirname(mediaPath))
+        await fs.writeFile(mediaPath, mediaBuffer)
+        
+        // Cache media with file path instead of buffer for memory efficiency
         statusMediaCache.set(messageId, {
-          buffer: mediaBuffer,
+          filePath: mediaPath,
           type: mediaType,
           mimetype: getMediaMimetype(message.message),
           timestamp: Date.now(),
-          caption: getMediaCaption(message.message)
+          caption: getMediaCaption(message.message),
+          fileName: fileName
         })
         
-        console.log(`✅ Status media cached: ${messageId} (${mediaType})`)
+        console.log(`✅ Status media cached: ${messageId} (${mediaType}) -> ${mediaPath}`)
         
-        // Clean up cache after 24 hours (status expires)
-        setTimeout(() => {
+        // Clean up cache and file after 24 hours (status expires)
+        setTimeout(async () => {
+          const cachedData = statusMediaCache.get(messageId)
+          if (cachedData && cachedData.filePath) {
+            try {
+              await fs.remove(cachedData.filePath)
+              console.log(`🗑️ Deleted expired status media file: ${cachedData.filePath}`)
+            } catch (e) {
+              console.error('Failed to delete expired media file:', e.message)
+            }
+          }
           statusMediaCache.delete(messageId)
           console.log(`🗑️ Cleaned up expired status cache: ${messageId}`)
         }, 24 * 60 * 60 * 1000)
@@ -95,7 +157,7 @@ async function handleStatusReply(client, message) {
     console.log(`📤 Sending status media to ${senderJid} who requested: "${text}"`)
     
     // Send the cached media to the requester
-    const mediaMessage = createMediaMessage(cachedMedia)
+    const mediaMessage = await createMediaMessage(cachedMedia)
     
     await client.socket.sendMessage(senderJid, mediaMessage)
     
@@ -124,37 +186,76 @@ function getMediaCaption(messageContent) {
   return ''
 }
 
+// Helper function to get media file extension
+function getMediaExtension(messageContent) {
+  if (messageContent.imageMessage) {
+    const mimetype = messageContent.imageMessage.mimetype || 'image/jpeg'
+    if (mimetype.includes('png')) return '.png'
+    if (mimetype.includes('gif')) return '.gif'
+    if (mimetype.includes('webp')) return '.webp'
+    return '.jpg'
+  }
+  if (messageContent.videoMessage) {
+    const mimetype = messageContent.videoMessage.mimetype || 'video/mp4'
+    if (mimetype.includes('webm')) return '.webm'
+    if (mimetype.includes('avi')) return '.avi'
+    return '.mp4'
+  }
+  if (messageContent.audioMessage) {
+    const mimetype = messageContent.audioMessage.mimetype || 'audio/ogg'
+    if (mimetype.includes('mp3')) return '.mp3'
+    if (mimetype.includes('wav')) return '.wav'
+    return '.ogg'
+  }
+  if (messageContent.stickerMessage) return '.webp'
+  if (messageContent.documentMessage) {
+    return messageContent.documentMessage.fileName ? 
+      path.extname(messageContent.documentMessage.fileName) : '.bin'
+  }
+  return '.bin'
+}
+
 // Helper function to create media message from cached data
-function createMediaMessage(cachedMedia) {
+async function createMediaMessage(cachedMedia) {
   const message = {}
   
-  switch (cachedMedia.type) {
-    case 'image':
-      message.image = cachedMedia.buffer
-      if (cachedMedia.caption) message.caption = cachedMedia.caption
-      break
-    case 'video':
-      message.video = cachedMedia.buffer
-      if (cachedMedia.caption) message.caption = cachedMedia.caption
-      break
-    case 'audio':
-      message.audio = cachedMedia.buffer
-      message.mimetype = cachedMedia.mimetype
-      break
-    case 'document':
-      message.document = cachedMedia.buffer
-      message.mimetype = cachedMedia.mimetype
-      if (cachedMedia.caption) message.caption = cachedMedia.caption
-      break
-    case 'sticker':
-      message.sticker = cachedMedia.buffer
-      break
-    default:
-      message.document = cachedMedia.buffer
-      message.mimetype = cachedMedia.mimetype
+  try {
+    // Read media from file path
+    const mediaBuffer = await fs.readFile(cachedMedia.filePath)
+    
+    switch (cachedMedia.type) {
+      case 'image':
+        message.image = mediaBuffer
+        if (cachedMedia.caption) message.caption = cachedMedia.caption
+        break
+      case 'video':
+        message.video = mediaBuffer
+        if (cachedMedia.caption) message.caption = cachedMedia.caption
+        break
+      case 'audio':
+        message.audio = mediaBuffer
+        message.mimetype = cachedMedia.mimetype
+        break
+      case 'document':
+        message.document = mediaBuffer
+        message.mimetype = cachedMedia.mimetype
+        if (cachedMedia.caption) message.caption = cachedMedia.caption
+        break
+      case 'sticker':
+        message.sticker = mediaBuffer
+        break
+      default:
+        message.document = mediaBuffer
+        message.mimetype = cachedMedia.mimetype
+    }
+    
+    return message
+    
+  } catch (error) {
+    console.error('Error reading cached media file:', error)
+    // Return empty message if file reading fails
+    return { text: '❌ Media file not found or corrupted' }
   }
-  
-  return message
 }
 
 // Hook into the client's message handling to intercept status updates and replies
