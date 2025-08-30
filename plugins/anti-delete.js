@@ -217,23 +217,20 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
     
     if (!targetJid) return
     
-    // Format the recovery message
-    const chatName = trackedMessage.isGroup ? chatJid : 'Private Chat'
-    const senderName = trackedMessage.senderJid.split('@')[0]
-    const timeDeleted = new Date().toLocaleString()
+    // Get sender name (remove @s.whatsapp.net and any numbers after ':')
+    const senderName = trackedMessage.senderJid.split('@')[0].split(':')[0]
     
-    let recoveryMessage = `🗑️ *DELETED MESSAGE DETECTED*\n\n`
-    recoveryMessage += `👤 *Sender:* ${senderName}\n`
-    recoveryMessage += `💬 *Chat:* ${chatName}\n`
-    recoveryMessage += `⏰ *Deleted at:* ${timeDeleted}\n`
-    
-    // Send text part if exists
+    // Send text part if exists using tag format like WhatsApp
     if (trackedMessage.text) {
-      recoveryMessage += `📝 *Original Message:*\n\n"${trackedMessage.text}"`
+      // Create a tagged message format similar to WhatsApp quote style
+      const taggedMessage = `┌ ${senderName}\n│ ${trackedMessage.text}\n└ 🗑️ _This message was deleted_`
+      
+      await socket.sendMessage(targetJid, { text: taggedMessage })
+    } else {
+      // For media-only messages
+      const taggedMessage = `┌ ${senderName}\n└ 🗑️ _This media was deleted_`
+      await socket.sendMessage(targetJid, { text: taggedMessage })
     }
-    
-    // Send recovery message first
-    await socket.sendMessage(targetJid, { text: recoveryMessage })
     
     // Send media if available
     if (trackedMessage.mediaData && trackedMessage.mediaData.buffer) {
@@ -244,14 +241,14 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
         case 'image':
           mediaMessage = {
             image: mediaData.buffer,
-            caption: `🗑️ Deleted ${mediaData.type} from ${senderName}`,
+            caption: `🗑️ _Deleted by ${senderName}_`,
             mimetype: mediaData.mimetype
           }
           break
         case 'video':
           mediaMessage = {
             video: mediaData.buffer,
-            caption: `🗑️ Deleted ${mediaData.type} from ${senderName}`,
+            caption: `🗑️ _Deleted by ${senderName}_`,
             mimetype: mediaData.mimetype
           }
           break
@@ -266,7 +263,7 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
           mediaMessage = {
             document: mediaData.buffer,
             mimetype: mediaData.mimetype,
-            fileName: `deleted_${mediaData.filename}`
+            fileName: mediaData.filename || 'deleted_file'
           }
           break
         case 'sticker':
