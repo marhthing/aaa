@@ -50,18 +50,19 @@ bot(
         return await message.reply('❌ Failed to download media')
       }
       
-      // Get sticker pack name from environment or use bot name
-      const packName = process.env.STICKER_NAME || process.env.STICKER_PACKNAME || 'MATDEV Bot'
-      const authorName = process.env.STICKER_AUTHOR || 'MATDEV Bot'
+      // Get sticker pack name - only use custom name if set, otherwise just MATDEV
+      const customName = process.env.STICKER_NAME || process.env.STICKER_PACKNAME
+      const packName = customName || 'MATDEV'
+      const authorName = customName ? '' : 'MATDEV'  // No author if custom name set
       
       // Create sticker with proper metadata using wa-sticker-formatter
       const sticker = new Sticker(buffer, {
         pack: packName,
         author: authorName,
-        type: StickerTypes.FULL,
+        type: StickerTypes.CROPPED,  // No curved edges, exact image
         categories: ['🤖'],
         id: Date.now().toString(),
-        quality: 50,
+        quality: 75,
         background: 'transparent'
       })
       
