@@ -5,7 +5,7 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["glib", "gtk3", "nss", "libdrm", "mesa", "chromium", "unzipNLS"]
+packages = ["glib", "gtk3", "nss", "libdrm", "mesa", "chromium", "unzipNLS", "ffmpeg"]
 
 [workflows]
 runButton = "Project"

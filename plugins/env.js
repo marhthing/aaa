@@ -108,10 +108,10 @@ async function viewEnvironmentVariables(message) {
     }
     
     if (Object.keys(userVars).length === 0) {
-      return await message.reply('No variables set')
+      return await message.reply('Environment variables\n\nNo variables set')
     }
     
-    let msg = ''
+    let msg = 'Environment variables\n\n'
     for (const [key, value] of Object.entries(userVars)) {
       msg += `${key} = ${value}\n`
     }
