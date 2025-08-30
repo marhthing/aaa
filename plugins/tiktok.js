@@ -1,6 +1,8 @@
 
 const { bot } = require('../lib/client')
 const axios = require('axios')
+const fs = require('fs-extra')
+const path = require('path')
 
 bot(
   {
@@ -68,16 +70,27 @@ bot(
           const author = data.author?.nickname || data.author?.unique_id || 'Unknown'
 
           if (videoUrl) {
-            const caption = `🎵 *TikTok Video*\n\n` +
-                           `👤 **Author:** ${author}\n` +
-                           `📝 **Title:** ${title.substring(0, 100)}${title.length > 100 ? '...' : ''}\n` +
-                           `🔗 **Source:** TikTok`
+            // Download video to temp file first (like ytv.js does)
+            const tempFile = await downloadFromDirectUrl(videoUrl, message.key.id)
+            if (tempFile) {
+              const caption = `🎵 *TikTok Video*\n\n` +
+                             `👤 **Author:** ${author}\n` +
+                             `📝 **Title:** ${title.substring(0, 100)}${title.length > 100 ? '...' : ''}\n` +
+                             `🔗 **Source:** TikTok`
 
-            await message.reply('', {
-              video: { url: videoUrl },
-              caption: caption
-            })
-            success = true
+              // Send video from file (like ytv.js does)
+              await message.client.socket.sendMessage(message.key.remoteJid, {
+                video: require('fs-extra').readFileSync(tempFile),
+                caption: caption
+              })
+              
+              // Clean up temp file
+              try {
+                require('fs-extra').unlinkSync(tempFile)
+              } catch (e) {}
+              
+              success = true
+            }
           }
         }
       } catch (error1) {
@@ -220,3 +233,35 @@ bot(
     }
   }
 )
+
+// Helper function to download video from direct URL to temp file
+async function downloadFromDirectUrl(directUrl, messageId) {
+  try {
+    const videoDir = path.join(__dirname, '../data/downloads/video')
+    await fs.ensureDir(videoDir)
+    
+    const filename = `tiktok_${messageId}_${Date.now()}.mp4`
+    const filepath = path.join(videoDir, filename)
+
+    const response = await axios({
+      method: 'GET',
+      url: directUrl,
+      responseType: 'stream',
+      timeout: 60000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    })
+
+    const writer = fs.createWriteStream(filepath)
+    response.data.pipe(writer)
+
+    return new Promise((resolve, reject) => {
+      writer.on('finish', () => resolve(filepath))
+      writer.on('error', reject)
+    })
+  } catch (error) {
+    console.error('Error downloading video:', error.message)
+    return null
+  }
+}
