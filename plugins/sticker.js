@@ -59,7 +59,7 @@ bot(
       const sticker = new Sticker(buffer, {
         pack: packName,
         author: authorName,
-        type: StickerTypes.CROPPED,  // No curved edges, exact image
+        type: StickerTypes.FULL,  // Curved edges like WhatsApp stickers
         categories: ['🤖'],
         id: Date.now().toString(),
         quality: 75,
