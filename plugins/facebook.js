@@ -1,3 +1,4 @@
+
 const { bot } = require('../lib/client')
 const fs = require('fs-extra')
 const path = require('path')
@@ -23,13 +24,14 @@ bot(
     
     const tempFile = await downloadFacebookVideo(url, message.key.id)
     if (!tempFile) {
-      return await message.reply('❌ Download failed')
+      return await message.reply('❌ Download failed - All methods unavailable. Facebook may have updated their security.')
     }
 
     try {
-      // Send video (exact same pattern as TikTok/YouTube)
+      // Send video
       await message.client.socket.sendMessage(message.key.remoteJid, {
-        video: fs.readFileSync(tempFile)
+        video: fs.readFileSync(tempFile),
+        caption: '🎥 *Facebook Video Downloaded*'
       })
 
     } catch (error) {
@@ -49,21 +51,22 @@ function isValidFacebookUrl(url) {
     /^https?:\/\/(www\.)?(facebook\.com|fb\.watch)\/.*\/videos?\//,
     /^https?:\/\/(www\.)?facebook\.com\/watch/,
     /^https?:\/\/fb\.watch\/[A-Za-z0-9_-]+/,
-    /^https?:\/\/(www\.)?facebook\.com\/share\/r\/[A-Za-z0-9]+/, // New 2025 share format
-    /^https?:\/\/(www\.)?facebook\.com\/share\/v\/[A-Za-z0-9]+/, // Share video format
-    /^https?:\/\/(www\.)?facebook\.com\/.*\/posts\/[0-9]+/, // Post format
-    /^https?:\/\/(www\.)?facebook\.com\/reel\/[0-9]+/ // Reel format
+    /^https?:\/\/(www\.)?facebook\.com\/share\/r\/[A-Za-z0-9]+/,
+    /^https?:\/\/(www\.)?facebook\.com\/share\/v\/[A-Za-z0-9]+/,
+    /^https?:\/\/(www\.)?facebook\.com\/.*\/posts\/[0-9]+/,
+    /^https?:\/\/(www\.)?facebook\.com\/reel\/[0-9]+/,
+    /^https?:\/\/(www\.)?facebook\.com\/.*\/videos\/[0-9]+/
   ]
   return patterns.some(pattern => pattern.test(url))
 }
 
 async function downloadFacebookVideo(url, messageId) {
-  // Using multiple fallbacks like successful TikTok/YouTube plugins
   const downloaders = [
-    () => downloadWithCobalt(url, messageId),
-    () => downloadWithSaveFrom(url, messageId),
-    () => downloadWithY2Mate(url, messageId),
-    () => downloadWithGeneric(url, messageId)
+    () => downloadWithSnapSave(url, messageId),
+    () => downloadWithFBDown(url, messageId),
+    () => downloadWithGetMyFB(url, messageId),
+    () => downloadWithFacebookIO(url, messageId),
+    () => downloadWithDirectScrape(url, messageId)
   ]
 
   for (let i = 0; i < downloaders.length; i++) {
@@ -81,95 +84,135 @@ async function downloadFacebookVideo(url, messageId) {
   return null
 }
 
-// Method 1: TikWM API (working for multiple platforms including Facebook)
-async function downloadWithCobalt(url, messageId) {
-  const response = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      'Referer': 'https://www.tikwm.com/',
-      'Accept': 'application/json'
-    },
-    timeout: 20000
-  })
-
-  if (response.data && response.data.code === 0 && response.data.data) {
-    const videoUrl = response.data.data.hdplay || response.data.data.play || response.data.data.wmplay
-    if (videoUrl) {
-      return await downloadFromDirectUrl(videoUrl, messageId)
+// Method 1: SnapSave (reliable for Facebook)
+async function downloadWithSnapSave(url, messageId) {
+  const response = await axios.post('https://snapsave.app/action.php?lang=en', 
+    `url=${encodeURIComponent(url)}`,
+    {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://snapsave.app/',
+        'Origin': 'https://snapsave.app'
+      },
+      timeout: 25000
     }
-  }
-  throw new Error('No download URL from TikWM')
-}
+  )
 
-// Method 2: SSSTik API (working for Facebook)
-async function downloadWithSaveFrom(url, messageId) {
-  const response = await axios.post('https://ssstik.io/abc', `id=${encodeURIComponent(url)}&locale=en&tt=bWJuZWdq`, {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      'Referer': 'https://ssstik.io/',
-      'Origin': 'https://ssstik.io'
-    },
-    timeout: 20000
-  })
-
-  // Parse HTML response for video URL
-  const videoMatch = response.data.match(/href="([^"]*)" class="without_watermark"/)
+  const videoMatch = response.data.match(/<a[^>]+href="([^"]+)"[^>]*>\s*Download\s+Video/i)
   if (videoMatch && videoMatch[1]) {
-    return await downloadFromDirectUrl(videoMatch[1], messageId)
+    return await downloadFromDirectUrl(videoMatch[1], messageId, 'fb_snap_')
   }
-  
-  throw new Error('No video URL from SSSTik')
+  throw new Error('No video URL from SnapSave')
 }
 
-// Method 3: Y2Mate (same as YouTube)
-async function downloadWithY2Mate(url, messageId) {
-  const apiUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://www.y2mate.com/mates/en68/analyze/ajax?url=${url}&q_auto=0&ajax=1`)}`
-
-  const response = await axios.get(apiUrl, { 
-    timeout: 30000,
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+// Method 2: FBDown
+async function downloadWithFBDown(url, messageId) {
+  const response = await axios.post('https://fbdown.net/download.php', 
+    `URLz=${encodeURIComponent(url)}`,
+    {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://fbdown.net/'
+      },
+      timeout: 25000
     }
+  )
+
+  const videoMatch = response.data.match(/href="([^"]+)"[^>]*>\s*Download\s+(HD|Normal)/i)
+  if (videoMatch && videoMatch[1]) {
+    return await downloadFromDirectUrl(videoMatch[1], messageId, 'fb_fbdown_')
+  }
+  throw new Error('No video URL from FBDown')
+}
+
+// Method 3: GetMyFB
+async function downloadWithGetMyFB(url, messageId) {
+  const response = await axios.post('https://getmyfb.com/process', {
+    id: url,
+    locale: 'en'
+  }, {
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
+      'Referer': 'https://getmyfb.com/'
+    },
+    timeout: 25000
   })
 
-  if (response.data?.contents) {
-    const contents = JSON.parse(response.data.contents)
-    if (contents.result?.includes('href=')) {
-      const match = contents.result.match(/href="([^"]+)"/)
-      if (match?.[1]) {
-        return await downloadFromDirectUrl(match[1], messageId)
-      }
+  if (response.data && response.data.success && response.data.data && response.data.data.length > 0) {
+    const videoUrl = response.data.data[0].url
+    if (videoUrl) {
+      return await downloadFromDirectUrl(videoUrl, messageId, 'fb_getmyfb_')
     }
   }
-  throw new Error('No download URL from Y2Mate')
+  throw new Error('No video URL from GetMyFB')
 }
 
-// Method 4: Generic backup method
-async function downloadWithGeneric(url, messageId) {
-  // Try TikWM API (works for multiple platforms)
-  const response = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`, {
+// Method 4: Facebook.io
+async function downloadWithFacebookIO(url, messageId) {
+  const response = await axios.post('https://facebook.io/download/', 
+    `url=${encodeURIComponent(url)}`,
+    {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://facebook.io/',
+        'Origin': 'https://facebook.io'
+      },
+      timeout: 25000
+    }
+  )
+
+  const videoMatch = response.data.match(/href="([^"]+)"[^>]*class="btn[^"]*"[^>]*>\s*Download/i)
+  if (videoMatch && videoMatch[1]) {
+    return await downloadFromDirectUrl(videoMatch[1], messageId, 'fb_fbio_')
+  }
+  throw new Error('No video URL from Facebook.io')
+}
+
+// Method 5: Direct scraping attempt
+async function downloadWithDirectScrape(url, messageId) {
+  const response = await axios.get(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
-      'Accept': 'application/json'
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'DNT': '1',
+      'Connection': 'keep-alive',
+      'Upgrade-Insecure-Requests': '1'
     },
     timeout: 30000
   })
 
-  if (response.data?.data?.play || response.data?.data?.wmplay) {
-    const videoUrl = response.data.data.play || response.data.data.wmplay
-    return await downloadFromDirectUrl(videoUrl, messageId)
+  // Look for video URLs in page source
+  const patterns = [
+    /"playable_url":"([^"]+)"/,
+    /"playable_url_quality_hd":"([^"]+)"/,
+    /"browser_native_hd_url":"([^"]+)"/,
+    /"browser_native_sd_url":"([^"]+)"/
+  ]
+
+  for (const pattern of patterns) {
+    const match = response.data.match(pattern)
+    if (match && match[1]) {
+      const videoUrl = match[1].replace(/\\u0026/g, '&').replace(/\\/g, '')
+      if (videoUrl.includes('video')) {
+        return await downloadFromDirectUrl(videoUrl, messageId, 'fb_direct_')
+      }
+    }
   }
-  
-  throw new Error('No download URL from Generic')
+  throw new Error('No video URL from direct scraping')
 }
 
-// Helper: Download from direct URL (same pattern as TikTok/YouTube)
-async function downloadFromDirectUrl(directUrl, messageId) {
+// Helper: Download from direct URL
+async function downloadFromDirectUrl(directUrl, messageId, prefix) {
   const videoDir = path.join(__dirname, '../data/downloads/video')
   await fs.ensureDir(videoDir)
 
-  const filename = `fb_${messageId}_${Date.now()}.mp4`
+  const filename = `${prefix}${messageId}_${Date.now()}.mp4`
   const filepath = path.join(videoDir, filename)
 
   const response = await axios({
@@ -178,7 +221,9 @@ async function downloadFromDirectUrl(directUrl, messageId) {
     responseType: 'stream',
     timeout: 60000,
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Accept': '*/*',
+      'Connection': 'keep-alive'
     }
   })
 
@@ -188,5 +233,11 @@ async function downloadFromDirectUrl(directUrl, messageId) {
   return new Promise((resolve, reject) => {
     writer.on('finish', () => resolve(filepath))
     writer.on('error', reject)
+    
+    // Add timeout for download
+    setTimeout(() => {
+      writer.destroy()
+      reject(new Error('Download timeout'))
+    }, 60000)
   })
 }
