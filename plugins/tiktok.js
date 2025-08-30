@@ -59,7 +59,7 @@ async function downloadTikTokVideo(url, messageId) {
   const downloaders = [
     () => downloadWithTikTokApiDl(url, messageId),
     () => downloadWithSsstik(url, messageId),
-    () => downloadWithCobalt(url, messageId),
+    () => downloadWithDirectScrape(url, messageId),
     () => downloadWithSnapTik(url, messageId)
   ]
 
@@ -92,63 +92,94 @@ async function downloadWithTikTokApiDl(url, messageId) {
   throw new Error('No video URL from tiktok-api-dl')
 }
 
-// Method 2: SSSTIK API
+// Method 2: SSSTIK API (Fixed)
 async function downloadWithSsstik(url, messageId) {
   const response = await axios.post('https://ssstik.io/abc', 
-    `id=${encodeURIComponent(url)}&locale=en&tt=bTVVOWU5`,
+    `id=${encodeURIComponent(url)}&locale=en&tt=bWVldGluZ18=`,
     {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://ssstik.io/'
       },
       timeout: 30000
     }
   )
 
-  // Parse HTML for video URL
-  const videoMatch = response.data.match(/href="([^"]+)">.*?Download Server/)
-  if (videoMatch?.[1]) {
-    return await downloadFromDirectUrl(videoMatch[1], messageId, 'ssstik_')
+  // Look for multiple video URL patterns
+  const patterns = [
+    /data-url="([^"]+)"/,
+    /href="([^"]+)">.*?Download/,
+    /"video_url":"([^"]+)"/,
+    /contentUrl.*?"([^"]+\.mp4[^"]*)"/ 
+  ]
+  
+  for (const pattern of patterns) {
+    const match = response.data.match(pattern)
+    if (match?.[1]) {
+      const videoUrl = match[1].replace(/\\u0026/g, '&').replace(/\\/g, '')
+      return await downloadFromDirectUrl(videoUrl, messageId, 'ssstik_')
+    }
   }
   throw new Error('No video URL from SSSTIK')
 }
 
-// Method 3: Cobalt API
-async function downloadWithCobalt(url, messageId) {
-  const response = await axios.post('https://co.wuk.sh/api/json', {
-    url: url,
-    vQuality: '720'
-  }, {
+// Method 3: Direct TikTok scraping
+async function downloadWithDirectScrape(url, messageId) {
+  const response = await axios.get(url, {
     headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    },
-    timeout: 30000
-  })
-
-  if (response.data?.url) {
-    return await downloadFromDirectUrl(response.data.url, messageId, 'cobalt_')
-  }
-  throw new Error('No download URL from Cobalt')
-}
-
-// Method 4: SnapTik
-async function downloadWithSnapTik(url, messageId) {
-  const formData = new URLSearchParams()
-  formData.append('url', url)
-  
-  const response = await axios.post('https://snaptik.app/abc2.php', formData, {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     },
     timeout: 30000
   })
 
-  // Parse response for download link
-  const linkMatch = response.data.match(/href="([^"]+)">.*?Download/)
-  if (linkMatch?.[1]) {
-    return await downloadFromDirectUrl(linkMatch[1], messageId, 'snaptik_')
+  // Look for video URL patterns in the page
+  const patterns = [
+    /"playAddr":"([^"]+)"/,
+    /"downloadAddr":"([^"]+)"/,
+    /"videoUrl":"([^"]+)"/,
+    /contentUrl.*?"([^"]+\.mp4[^"]*)"/
+  ]
+  
+  for (const pattern of patterns) {
+    const match = response.data.match(pattern)
+    if (match?.[1]) {
+      const videoUrl = match[1].replace(/\\u0026/g, '&').replace(/\\/g, '')
+      return await downloadFromDirectUrl(videoUrl, messageId, 'tiktok_scrape_')
+    }
+  }
+  throw new Error('No video URL from direct scraping')
+}
+
+// Method 4: SnapTik (Fixed)
+async function downloadWithSnapTik(url, messageId) {
+  const formData = new URLSearchParams()
+  formData.append('url', url)
+  formData.append('token', '')
+  
+  const response = await axios.post('https://snaptik.app/abc2.php', formData, {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Referer': 'https://snaptik.app/',
+      'Origin': 'https://snaptik.app'
+    },
+    timeout: 30000
+  })
+
+  // Look for multiple download link patterns
+  const patterns = [
+    /data-url="([^"]+)"/,
+    /href="([^"]+)"[^>]*>.*?Download/i,
+    /"video_url":"([^"]+)"/,
+    /onclick="window\.open\('([^']+)'/
+  ]
+  
+  for (const pattern of patterns) {
+    const match = response.data.match(pattern)
+    if (match?.[1] && match[1].includes('.mp4')) {
+      return await downloadFromDirectUrl(match[1], messageId, 'snaptik_')
+    }
   }
   throw new Error('No video URL from SnapTik')
 }

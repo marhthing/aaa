@@ -73,36 +73,59 @@ async function downloadFacebookVideo(url, messageId) {
 }
 
 async function downloadWithSnapSave(url, messageId) {
-  const response = await axios.post('https://snapsave.app/action.php', {
-    url: url
-  }, {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    },
-    timeout: 30000
-  })
+  const response = await axios.post('https://snapsave.app/action2.php', 
+    `url=${encodeURIComponent(url)}&lang=en`,
+    {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://snapsave.app/'
+      },
+      timeout: 30000
+    }
+  )
 
-  const videoMatch = response.data.match(/href="([^"]+)".*?download.*?video/i)
-  if (videoMatch?.[1]) {
-    return await downloadFromDirectUrl(videoMatch[1], messageId, 'fb_snap_')
+  // Look for HD and SD video links
+  const patterns = [
+    /href="([^"]+)"[^>]*>.*?Download.*?HD/i,
+    /href="([^"]+)"[^>]*>.*?Download.*?SD/i,
+    /data-url="([^"]+)"/
+  ]
+  
+  for (const pattern of patterns) {
+    const match = response.data.match(pattern)
+    if (match?.[1] && match[1].includes('.mp4')) {
+      return await downloadFromDirectUrl(match[1], messageId, 'fb_snap_')
+    }
   }
   throw new Error('No video URL from SnapSave')
 }
 
 async function downloadWithFDown(url, messageId) {
-  const response = await axios.post('https://fdown.net/download', {
-    URLz: url
-  }, {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    timeout: 30000
-  })
+  const response = await axios.post('https://fdown.net/download', 
+    `URLz=${encodeURIComponent(url)}`,
+    {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://fdown.net/'
+      },
+      timeout: 30000
+    }
+  )
 
-  const videoMatch = response.data.match(/href="([^"]+)".*?Download.*?HD/i)
-  if (videoMatch?.[1]) {
-    return await downloadFromDirectUrl(videoMatch[1], messageId, 'fb_fdown_')
+  // Look for download links in response
+  const patterns = [
+    /href="([^"]+)"[^>]*>.*?Download.*?HD/i,
+    /href="([^"]+)"[^>]*>.*?Download.*?Normal/i,
+    /data-url="([^"]+)"/
+  ]
+  
+  for (const pattern of patterns) {
+    const match = response.data.match(pattern)
+    if (match?.[1] && match[1].includes('video.fbcdn.net')) {
+      return await downloadFromDirectUrl(match[1], messageId, 'fb_fdown_')
+    }
   }
   throw new Error('No video URL from FDown')
 }

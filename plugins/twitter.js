@@ -71,50 +71,87 @@ async function downloadTwitterVideo(url, messageId) {
 }
 
 async function downloadWithSSSTwitter(url, messageId) {
-  const response = await axios.post('https://ssstwitter.com/api/download', {
-    url: url
-  }, {
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    timeout: 30000
-  })
+  const response = await axios.post('https://ssstwitter.com/tweet.php', 
+    `id=${encodeURIComponent(url)}&locale=en`,
+    {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://ssstwitter.com/'
+      },
+      timeout: 30000
+    }
+  )
 
-  if (response.data?.video_url) {
-    return await downloadFromDirectUrl(response.data.video_url, messageId, 'twitter_sss_')
+  // Look for video download links
+  const patterns = [
+    /href="([^"]+)"[^>]*>.*?Download.*?HD/i,
+    /data-url="([^"]+)"/,
+    /"video_url":"([^"]+)"/
+  ]
+  
+  for (const pattern of patterns) {
+    const match = response.data.match(pattern)
+    if (match?.[1] && match[1].includes('.mp4')) {
+      return await downloadFromDirectUrl(match[1], messageId, 'twitter_sss_')
+    }
   }
   throw new Error('No video URL from SSSTwitter')
 }
 
 async function downloadWithTwitterVid(url, messageId) {
-  const response = await axios.get(`https://twittervid.com/download?url=${encodeURIComponent(url)}`, {
+  const response = await axios.get(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     },
     timeout: 30000
   })
 
-  const videoMatch = response.data.match(/href="([^"]+)".*?download.*?video/i)
-  if (videoMatch?.[1]) {
-    return await downloadFromDirectUrl(videoMatch[1], messageId, 'twitter_vid_')
+  // Direct scraping from Twitter page
+  const patterns = [
+    /"video_url":"([^"]+)"/,
+    /property="og:video" content="([^"]+)"/,
+    /"contentUrl":"([^"]+)"/,
+    /"variants":\[\{[^}]*"url":"([^"]+\.mp4[^"]*)"/
+  ]
+  
+  for (const pattern of patterns) {
+    const match = response.data.match(pattern)
+    if (match?.[1]) {
+      const videoUrl = match[1].replace(/\\u0026/g, '&').replace(/\\/g, '')
+      return await downloadFromDirectUrl(videoUrl, messageId, 'twitter_direct_')
+    }
   }
-  throw new Error('No video URL from TwitterVid')
+  throw new Error('No video URL from direct Twitter scraping')
 }
 
 async function downloadWithTwitterDownloader(url, messageId) {
-  const response = await axios.post('https://twittervideodownloader.com/api/twitter', {
-    url: url
-  }, {
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    timeout: 30000
-  })
+  const response = await axios.post('https://twdownload.com/download.php', 
+    `url=${encodeURIComponent(url)}`,
+    {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://twdownload.com/'
+      },
+      timeout: 30000
+    }
+  )
 
-  if (response.data?.download_url) {
-    return await downloadFromDirectUrl(response.data.download_url, messageId, 'twitter_dl_')
+  // Look for download links
+  const patterns = [
+    /href="([^"]+)"[^>]*>.*?Download.*?HD/i,
+    /data-url="([^"]+)"/,
+    /"download_url":"([^"]+)"/
+  ]
+  
+  for (const pattern of patterns) {
+    const match = response.data.match(pattern)
+    if (match?.[1] && match[1].includes('.mp4')) {
+      return await downloadFromDirectUrl(match[1], messageId, 'twitter_twdl_')
+    }
   }
-  throw new Error('No video URL from TwitterDownloader')
+  throw new Error('No video URL from TWDownload')
 }
 
 async function downloadFromDirectUrl(directUrl, messageId, prefix) {

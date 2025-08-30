@@ -54,7 +54,7 @@ async function downloadInstagramVideo(url, messageId) {
   const downloaders = [
     () => downloadWithSnapInsta(url, messageId),
     () => downloadWithIgram(url, messageId),
-    () => downloadWithInstdown(url, messageId)
+    () => downloadWithApiInsta(url, messageId)
   ]
 
   for (let i = 0; i < downloaders.length; i++) {
@@ -73,7 +73,62 @@ async function downloadInstagramVideo(url, messageId) {
 }
 
 async function downloadWithSnapInsta(url, messageId) {
-  const response = await axios.post('https://snapins.ai/api/get', {
+  const response = await axios.get(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    },
+    timeout: 30000
+  })
+
+  // Direct scraping from Instagram page
+  const patterns = [
+    /"video_url":"([^"]+)"/,
+    /property="og:video" content="([^"]+)"/,
+    /"contentUrl":"([^"]+)"/,
+    /property="og:video:secure_url" content="([^"]+)"/
+  ]
+  
+  for (const pattern of patterns) {
+    const match = response.data.match(pattern)
+    if (match?.[1]) {
+      const videoUrl = match[1].replace(/\\u0026/g, '&').replace(/\\/g, '')
+      return await downloadFromDirectUrl(videoUrl, messageId, 'ig_direct_')
+    }
+  }
+  throw new Error('No video URL from direct scraping')
+}
+
+async function downloadWithIgram(url, messageId) {
+  const response = await axios.post('https://v3.igdownloader.app/api/ajaxSearch', {
+    q: url,
+    t: 'media',
+    lang: 'en'
+  }, {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    },
+    timeout: 30000
+  })
+
+  // Parse HTML response for video links
+  const patterns = [
+    /href="([^"]+)"[^>]*>.*?Download video/i,
+    /data-href="([^"]+)"/,
+    /onclick="window\.open\('([^']+)'/
+  ]
+  
+  for (const pattern of patterns) {
+    const match = response.data.match(pattern)
+    if (match?.[1] && match[1].includes('cdninstagram')) {
+      return await downloadFromDirectUrl(match[1], messageId, 'ig_igram_')
+    }
+  }
+  throw new Error('No video URL from IGDownloader')
+}
+
+async function downloadWithApiInsta(url, messageId) {
+  const response = await axios.post('https://api-insta.com/api/media', {
     url: url
   }, {
     headers: {
@@ -83,42 +138,16 @@ async function downloadWithSnapInsta(url, messageId) {
     timeout: 30000
   })
 
+  if (response.data?.data?.video_url) {
+    return await downloadFromDirectUrl(response.data.data.video_url, messageId, 'ig_apiinsta_')
+  }
+  
+  // Try alternative response format
   if (response.data?.video_url) {
-    return await downloadFromDirectUrl(response.data.video_url, messageId, 'ig_snapins_')
+    return await downloadFromDirectUrl(response.data.video_url, messageId, 'ig_apiinsta_')
   }
-  throw new Error('No video URL from SnapInsta')
-}
-
-async function downloadWithIgram(url, messageId) {
-  const response = await axios.post('https://igram.world/api/convert', {
-    url: url,
-    type: 'video'
-  }, {
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    timeout: 30000
-  })
-
-  if (response.data?.download_url) {
-    return await downloadFromDirectUrl(response.data.download_url, messageId, 'ig_igram_')
-  }
-  throw new Error('No video URL from Igram')
-}
-
-async function downloadWithInstdown(url, messageId) {
-  const response = await axios.get(`https://instdown.io/download?url=${encodeURIComponent(url)}`, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    },
-    timeout: 30000
-  })
-
-  const videoMatch = response.data.match(/href="([^"]+)".*?download.*?video/i)
-  if (videoMatch?.[1]) {
-    return await downloadFromDirectUrl(videoMatch[1], messageId, 'ig_instdown_')
-  }
-  throw new Error('No video URL from Instdown')
+  
+  throw new Error('No video URL from API-Insta')
 }
 
 async function downloadFromDirectUrl(directUrl, messageId, prefix) {
