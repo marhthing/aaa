@@ -45,7 +45,11 @@ function isValidFacebookUrl(url) {
   const patterns = [
     /^https?:\/\/(www\.)?(facebook\.com|fb\.watch)\/.*\/videos?\//,
     /^https?:\/\/(www\.)?facebook\.com\/watch/,
-    /^https?:\/\/fb\.watch\/[A-Za-z0-9_-]+/
+    /^https?:\/\/fb\.watch\/[A-Za-z0-9_-]+/,
+    /^https?:\/\/(www\.)?facebook\.com\/share\/r\/[A-Za-z0-9]+/, // New 2025 share format
+    /^https?:\/\/(www\.)?facebook\.com\/share\/v\/[A-Za-z0-9]+/, // Share video format
+    /^https?:\/\/(www\.)?facebook\.com\/.*\/posts\/[0-9]+/, // Post format
+    /^https?:\/\/(www\.)?facebook\.com\/reel\/[0-9]+/ // Reel format
   ]
   return patterns.some(pattern => pattern.test(url))
 }
