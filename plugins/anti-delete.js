@@ -6,6 +6,9 @@ const path = require('path')
 // Store for tracking messages temporarily
 const messageTracker = new Map()
 
+// Store to prevent duplicate deletion notifications
+const deletionCache = new Map()
+
 // Configuration for anti-delete
 let antiDeleteConfig = {
   enabled: true,
@@ -139,11 +142,35 @@ async function handleDeletedMessage(socket, deletedMessageId, chatJid) {
     return
   }
   
+  // Create a unique key for this deletion event to prevent duplicates
+  const deletionKey = `${deletedMessageId}_${normalizeJid(chatJid)}`
+  
+  // Check if we've already processed this deletion recently (within 5 seconds)
+  const now = Date.now()
+  const lastProcessed = deletionCache.get(deletionKey)
+  if (lastProcessed && (now - lastProcessed) < 5000) {
+    console.log(`⏭️ Duplicate deletion event ignored: ${deletedMessageId}`)
+    return
+  }
+  
+  // Store this deletion event
+  deletionCache.set(deletionKey, now)
+  
+  // Clean up old deletion cache entries (older than 1 minute)
+  for (const [key, timestamp] of deletionCache.entries()) {
+    if (now - timestamp > 60000) {
+      deletionCache.delete(key)
+    }
+  }
+  
   // If ignoring owner messages, check if this deletion is from owner and skip
   if (antiDeleteConfig.ignoreOwner && socket.user) {
     const ownerJid = socket.user.id
+    const normalizedChatJid = normalizeJid(chatJid)
+    const normalizedOwnerJid = normalizeJid(ownerJid)
+    
     // Skip if the chat is with owner (personal messages from owner)
-    if (chatJid === ownerJid || chatJid.startsWith(ownerJid.split('@')[0])) {
+    if (normalizedChatJid === normalizedOwnerJid) {
       console.log(`⏭️ Skipping owner message deletion: ${deletedMessageId}`)
       return
     }
@@ -405,6 +432,15 @@ bot(
     }
   }
 )
+
+// Helper function to normalize JID for comparison
+function normalizeJid(jid) {
+  if (!jid) return ''
+  
+  // Remove any suffix numbers that WhatsApp sometimes adds
+  // Convert 2347046040727:26@s.whatsapp.net to 2347046040727@s.whatsapp.net
+  return jid.replace(/:\d+@/, '@')
+}
 
 // Initialize the system
 initializeAntiDelete()
