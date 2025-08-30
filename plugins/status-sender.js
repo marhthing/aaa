@@ -65,9 +65,14 @@ bot(
 // Function to handle status updates (when owner posts to status)
 async function handleStatusUpdate(client, message) {
   try {
+    console.log(`🔍 Status update check: remoteJid=${message.key.remoteJid}, participant=${message.key.participant}`)
+    
     // Check if this is a status update from the bot owner
     const isStatusUpdate = message.key.remoteJid === 'status@broadcast'
-    const isFromOwner = client.isOwnerJid(message.key.participant || message.sender)
+    const senderJid = message.key.participant || message.key.remoteJid
+    const isFromOwner = client.isOwnerJid(senderJid)
+    
+    console.log(`🔍 Status analysis: isStatusUpdate=${isStatusUpdate}, isFromOwner=${isFromOwner}, senderJid=${senderJid}`)
     
     if (!isStatusUpdate || !isFromOwner) return
     
@@ -108,7 +113,9 @@ async function handleStatusUpdate(client, message) {
         } catch (error) {
           console.error('Error finding archived status media:', error)
         }
-      }, 1000) // 1 second delay to let media archive save first
+      }, 2000) // 2 second delay to let media archive save first
+    } else {
+      console.log('📱 Owner posted text status (no media)')
     }
     
   } catch (error) {
