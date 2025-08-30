@@ -59,9 +59,10 @@ bot(
       const packName = process.env.STICKER_NAME || 'MATDEV Bot'
       
       try {
-        // Send sticker
+        // Send sticker with proper metadata
         await message.client.socket.sendMessage(message.key.remoteJid, {
-          sticker: stickerResult.buffer,
+          sticker: stickerResult.buffer
+        }, {
           packname: packName,
           author: 'MATDEV Bot'
         })
@@ -103,8 +104,9 @@ async function convertToSticker(buffer, mediaType, messageId) {
         .toBuffer()
       
       // Save to data folder temporarily
-      const stickerPath = path.join(__dirname, '../data/downloads/sticker', `${messageId}_${timestamp}.webp`)
-      await fs.ensureDir(path.dirname(stickerPath))
+      const stickerDir = path.join(__dirname, '../data/downloads/sticker')
+      const stickerPath = path.join(stickerDir, `${messageId}_${timestamp}.webp`)
+      await fs.ensureDir(stickerDir)
       await fs.writeFile(stickerPath, stickerBuffer)
       
       console.log(`💾 Sticker saved temporarily: ${stickerPath}`)
@@ -120,7 +122,8 @@ async function convertToSticker(buffer, mediaType, messageId) {
         const tempOutput = path.join(__dirname, '../data/downloads/sticker', `${messageId}_${timestamp}.webp`)
         
         // Ensure sticker directory exists
-        fs.ensureDirSync(path.dirname(tempOutput))
+        const stickerDir = path.dirname(tempOutput)
+        fs.ensureDirSync(stickerDir)
         
         // Save input buffer
         fs.writeFileSync(tempInput, buffer)
