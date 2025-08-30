@@ -8,7 +8,10 @@ if (existsSync(envPath)) {
 }
 
 // Utility function to convert string to boolean
-const toBool = (x) => x?.toLowerCase() === 'true'
+const toBool = (x) => {
+    if (!x || x.trim() === '') return undefined
+    return x.toLowerCase() === 'true'
+}
 
 // Helper function to get number from env with default
 const toNumber = (x, defaultValue) => {
@@ -62,8 +65,8 @@ module.exports = {
     GAME_TIMEOUT: toNumber(process.env.GAME_TIMEOUT, 600000), // 10 minutes
     MAX_ACTIVE_GAMES: toNumber(process.env.MAX_ACTIVE_GAMES, 5),
     
-    // Security & Access
-    OWNER_ONLY: toBool(process.env.OWNER_ONLY) ?? true,
+    // Security & Access  
+    OWNER_ONLY: toBool(process.env.OWNER_ONLY) ?? true, // Default: true (owner only)
     SUDO: process.env.SUDO || '',
     COMMAND_COOLDOWN: toNumber(process.env.COMMAND_COOLDOWN, 1000),
     RATE_LIMIT: toBool(process.env.RATE_LIMIT) ?? true,
