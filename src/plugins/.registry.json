@@ -1,12 +1,12 @@
 {
   "version": "1.0.0",
-  "lastUpdated": "2025-08-29T18:05:02.400Z",
+  "lastUpdated": "2025-08-30T05:27:59.649Z",
   "plugins": [
     {
       "name": "admin-tools",
       "version": "1.0.0",
       "enabled": true,
-      "loadedAt": "2025-08-24T15:33:12.233Z",
+      "loadedAt": "2025-08-30T05:27:59.497Z",
       "commands": [
         "systeminfo",
         "plugins",
@@ -21,7 +21,7 @@
       "name": "anti-delete",
       "version": "2.0.0",
       "enabled": true,
-      "loadedAt": "2025-08-24T15:33:12.284Z",
+      "loadedAt": "2025-08-30T05:27:59.504Z",
       "commands": [
         "delete"
       ]
@@ -30,7 +30,7 @@
       "name": "core-commands",
       "version": "2.0.0",
       "enabled": true,
-      "loadedAt": "2025-08-24T15:33:12.287Z",
+      "loadedAt": "2025-08-30T05:27:59.507Z",
       "commands": [
         "help",
         "info",
@@ -49,7 +49,7 @@
       "name": "enhance",
       "version": "1.0.0",
       "enabled": true,
-      "loadedAt": "2025-08-24T15:33:12.297Z",
+      "loadedAt": "2025-08-30T05:27:59.509Z",
       "commands": [
         "enhance",
         "enhancestatus"
@@ -59,16 +59,35 @@
       "name": "jid",
       "version": "1.0.0",
       "enabled": true,
-      "loadedAt": "2025-08-24T15:33:12.301Z",
+      "loadedAt": "2025-08-30T05:27:59.510Z",
       "commands": [
         "jid"
+      ]
+    },
+    {
+      "name": "ping",
+      "version": "1.0.0",
+      "enabled": true,
+      "loadedAt": "2025-08-30T05:27:59.512Z",
+      "commands": [
+        "ping",
+        "pinginfo"
+      ]
+    },
+    {
+      "name": "plugin-installer",
+      "version": "1.0.0",
+      "enabled": true,
+      "loadedAt": "2025-08-30T05:27:59.513Z",
+      "commands": [
+        "plugin"
       ]
     },
     {
       "name": "sticker",
       "version": "1.0.0",
       "enabled": true,
-      "loadedAt": "2025-08-24T15:33:12.927Z",
+      "loadedAt": "2025-08-30T05:27:59.548Z",
       "commands": [
         "sticker",
         "s"
@@ -78,7 +97,7 @@
       "name": "tiktok-downloader",
       "version": "1.0.0",
       "enabled": true,
-      "loadedAt": "2025-08-24T15:33:12.964Z",
+      "loadedAt": "2025-08-30T05:27:59.550Z",
       "commands": [
         "tiktok"
       ]
@@ -87,19 +106,9 @@
       "name": "youtube-downloader",
       "version": "1.0.0",
       "enabled": true,
-      "loadedAt": "2025-08-24T15:33:13.588Z",
+      "loadedAt": "2025-08-30T05:27:59.649Z",
       "commands": [
         "ytv"
-      ]
-    },
-    {
-      "name": "ping",
-      "version": "1.0.0",
-      "enabled": true,
-      "loadedAt": "2025-08-29T18:05:02.399Z",
-      "commands": [
-        "ping",
-        "pinginfo"
       ]
     }
   ]
