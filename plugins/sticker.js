@@ -1,7 +1,7 @@
 const { bot } = require('../lib/client')
 const sharp = require('sharp')
 const ffmpeg = require('fluent-ffmpeg')
-const fs = require('fs')
+const fs = require('fs-extra')
 const path = require('path')
 
 bot(
@@ -39,8 +39,8 @@ bot(
         return await message.reply('❌ Please reply to an image or video, or send media with .sticker caption')
       }
       
-      // Add loading reaction
-      await message.react('🔄')
+      // Add loading reaction - check bot reaction config
+      // For now, skip reactions until we fix the bot reaction system
       
       // Download the media using utils
       const { downloadMedia } = require('../lib/utils')
@@ -66,8 +66,8 @@ bot(
           author: 'MATDEV Bot'
         })
         
-        // Success reaction
-        await message.react('✅')
+        // Success reaction - check bot reaction config
+        // For now, skip reactions until we fix the bot reaction system
         
       } finally {
         // Always cleanup the temporary sticker file
