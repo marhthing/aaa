@@ -27,21 +27,36 @@ bot(
   },
   async (message, match) => {
     try {
+      console.log('🔍 Save command started - checking quoted message...')
+      
       // Check if this is a reply to a status
       const quotedMessage = message.message?.extendedTextMessage?.contextInfo?.quotedMessage
+      console.log(`🔍 Quoted message exists: ${!!quotedMessage}`)
+      
       if (!quotedMessage) {
+        console.log('❌ No quoted message found')
         return await message.reply('❌ Please reply to a status message with .save to save the media')
       }
 
       // Get the quoted message ID
       const quotedMessageId = message.message?.extendedTextMessage?.contextInfo?.stanzaId
+      console.log(`🔍 Quoted message ID: ${quotedMessageId}`)
+      
       if (!quotedMessageId) {
+        console.log('❌ No quoted message ID found')
         return await message.reply('❌ Unable to identify the status message')
       }
 
       // Check if we have cached media for this status
+      console.log(`🔍 Checking cache for message ID: ${quotedMessageId}`)
+      console.log(`🔍 Cache has ${statusMediaCache.size} entries`)
+      console.log(`🔍 Cache keys: ${Array.from(statusMediaCache.keys()).join(', ')}`)
+      
       const cachedMedia = statusMediaCache.get(quotedMessageId)
+      console.log(`🔍 Cached media found: ${!!cachedMedia}`)
+      
       if (!cachedMedia) {
+        console.log('❌ No cached media found for this message ID')
         return await message.reply('❌ No media found for this status. Media may have expired or not been cached.')
       }
 
@@ -56,7 +71,7 @@ bot(
       console.log(`✅ Status media saved for bot owner: ${botOwnerJid}`)
       
     } catch (error) {
-      console.error('Error saving status media:', error)
+      console.error('❌ Error saving status media:', error)
       await message.reply('❌ Failed to save status media. Please try again.')
     }
   }
