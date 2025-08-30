@@ -73,12 +73,19 @@ async function handleStatusUpdate(client, message) {
     const isFromOwner = client.isOwnerJid(senderJid)
     
     console.log(`🔍 Status analysis: isStatusUpdate=${isStatusUpdate}, isFromOwner=${isFromOwner}, senderJid=${senderJid}`)
+    console.log(`🔍 Owner comparison: bot owner=${client.ownerJid}, status sender=${senderJid}`)
     
-    if (!isStatusUpdate || !isFromOwner) return
+    if (!isStatusUpdate) return
+    
+    // Handle both owner's status and other people's status
+    if (!isFromOwner) {
+      console.log('📱 Status from other user - will cache for .save feature')
+    }
     
     // Check if status contains media
     if (client.hasMedia(message.message)) {
-      console.log('📱 Owner posted media status, waiting for media archive to save it...')
+      const userType = isFromOwner ? 'Owner' : 'User'
+      console.log(`📱 ${userType} posted media status, waiting for media archive to save it...`)
       
       // Wait a bit for the media archive system to save the media first
       setTimeout(async () => {
